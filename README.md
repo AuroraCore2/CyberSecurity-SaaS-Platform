@@ -109,4 +109,3 @@ Railway handles logging, environment variables, and the database for you. Enjoy!
 - Interactive dashboard with charts and metrics
 - AI-powered security assistant chat
 - Threat intelligence correlation
-```
