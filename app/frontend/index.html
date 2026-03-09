@@ -275,6 +275,12 @@
         .t-dot:nth-child(2){animation-delay:.18s} .t-dot:nth-child(3){animation-delay:.36s}
         @keyframes tdot{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}
 
+        @keyframes load-bar {
+            0%   { left: 0%; width: 0%; }
+            50%  { left: 0%; width: 100%; }
+            100% { left: 100%; width: 0%; }
+        }
+
         /* Responsive */
         @media (max-width: 1024px) {
             .chat-layout { grid-template-columns: 1fr; }
@@ -310,7 +316,10 @@
         </svg>
     </div>
     <h2 style="font-family:'Space Grotesk'; color:var(--text-high); margin-bottom:10px;">ANALYZING THREAT DATA</h2>
-    <div style="font-family:'JetBrains Mono'; font-size:0.8rem; color:var(--cyber-blue); letter-spacing:2px; animation:blink-dot 1.5s infinite;">CORRELATING EVENTS &amp; EXTRACTING IOCS...</div>
+    <div style="font-family:'JetBrains Mono'; font-size:0.8rem; color:var(--cyber-blue); letter-spacing:2px; animation:blink-dot 1.5s infinite; margin-bottom: 20px;">CORRELATING EVENTS &amp; EXTRACTING IOCS...</div>
+    <div style="width: 250px; height: 3px; background: rgba(255,0,60,0.1); border-radius: 4px; overflow: hidden; position: relative;">
+        <div style="position: absolute; top: 0; left: 0; height: 100%; background: #ff003c; animation: load-bar 1.5s infinite ease-in-out; border-radius: 4px; box-shadow: 0 0 10px #ff003c;"></div>
+    </div>
 </div>
 
 <canvas id="neural-canvas"></canvas>

@@ -22,8 +22,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.api import logs, incidents, chat
+
+# Mount routers
 app.include_router(logs.router)
 app.include_router(incidents.router)
+app.include_router(chat.router)
 
 # Mount frontend directory for static assets
 # Actually, since everything is in index.html, we just need to serve the file
