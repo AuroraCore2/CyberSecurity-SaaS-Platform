@@ -9,6 +9,8 @@ Users can upload system, firewall, or application logs and ThreatMind instantly:
 - Performs threat intelligence on suspicious IPs/domains<br>
 - Provides explanations and remediation advice through an AI security assistant<br>
 
+## Live Demo: (https://threatmind.vercel.app/)
+
 The platform simplifies complex cybersecurity workflows and empowers even non-experts to understand system threats using an intuitive dashboard and chatbot interface.
 
 <img src="images/ThreatMind.png" width=1000 >
