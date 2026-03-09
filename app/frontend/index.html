@@ -294,6 +294,25 @@
 </head>
 <body>
 
+<div id="loading-overlay" style="display:none; position:fixed; inset:0; background:rgba(3,3,3,0.9); z-index:10000; justify-content:center; align-items:center; flex-direction:column; backdrop-filter:blur(10px);">
+    <div class="logo-mark pulse-sync" style="width:80px; height:80px; margin-bottom:24px;">
+        <svg width="80" height="80" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 4 L4 4 L4 6" stroke="#ff003c" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M26 4 L28 4 L28 6" stroke="#ff003c" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M4 26 L4 28 L6 28" stroke="#ff003c" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M28 26 L28 28 L26 28" stroke="#ff003c" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="16" y1="4" x2="16" y2="10" stroke="#ff003c" stroke-width="1.2" opacity="0.5"/>
+            <line x1="16" y1="22" x2="16" y2="28" stroke="#ff003c" stroke-width="1.2" opacity="0.5"/>
+            <line x1="4" y1="16" x2="10" y2="16" stroke="#ff003c" stroke-width="1.2" opacity="0.5"/>
+            <line x1="22" y1="16" x2="28" y2="16" stroke="#ff003c" stroke-width="1.2" opacity="0.5"/>
+            <circle cx="16" cy="16" r="5" stroke="#ff003c" stroke-width="1.5" fill="rgba(255,0,60,0.1)"/>
+            <circle cx="16" cy="16" r="2" fill="#ff003c"/>
+        </svg>
+    </div>
+    <h2 style="font-family:'Space Grotesk'; color:var(--text-high); margin-bottom:10px;">ANALYZING THREAT DATA</h2>
+    <div style="font-family:'JetBrains Mono'; font-size:0.8rem; color:var(--cyber-blue); letter-spacing:2px; animation:blink-dot 1.5s infinite;">CORRELATING EVENTS &amp; EXTRACTING IOCS...</div>
+</div>
+
 <canvas id="neural-canvas"></canvas>
 <div id="cursor-glow"></div>
 <div id="cursor-dot"></div>
@@ -824,9 +843,17 @@ function resetTilt(card) { card.style.transform='perspective(1000px) rotateX(0de
 let charts = {};
 
 function processFile(file) {
-    const reader = new FileReader();
-    reader.onload = e => renderDashboard(parseLines(e.target.result.split('\n').filter(l=>l.trim())));
-    reader.readAsText(file);
+    document.getElementById('loading-overlay').style.display = 'flex';
+    setTimeout(() => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            setTimeout(() => {
+                renderDashboard(parseLines(e.target.result.split('\n').filter(l=>l.trim())));
+                document.getElementById('loading-overlay').style.display = 'none';
+            }, 50);
+        };
+        reader.readAsText(file);
+    }, 50);
 }
 
 function parseLines(lines) {
@@ -879,8 +906,12 @@ function loadDemo() {
         {timestamp:'2024-02-10 10:14:00',ip:'185.220.101.5',method:'POST',endpoint:'/login',status:'200',severity:'CRITICAL'},
         {timestamp:'2024-02-10 10:14:30',ip:'192.168.1.10',method:'GET',endpoint:'/static/app.js',status:'200',severity:'LOW'},
     ];
-    showPage('dashboard');
-    renderDashboard(demo);
+    document.getElementById('loading-overlay').style.display = 'flex';
+    setTimeout(() => {
+        showPage('dashboard');
+        renderDashboard(demo);
+        document.getElementById('loading-overlay').style.display = 'none';
+    }, 600);
 }
 
 function renderDashboard(rows) {
