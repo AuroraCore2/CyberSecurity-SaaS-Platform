@@ -157,21 +157,68 @@ def parse_logs(raw_text: str) -> List[LogEvent]:
             ))
             continue
 
-        # ---------- FALLBACK (generic events, try to keep timestamp) ----------
+        # ---------- FALLBACK (generic events, try to keep data structured) ----------
         timestamp = "unknown"
-        # ISO‑like: 2026-02-16 10:17:33
-        m = re.match(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
+        # ISO-like: 2026-02-16 10:17:33
+        m = re.search(r"(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})", line)
         if not m:
-            # Apache‑style date: 16/Feb/2026:10:17:33 +0000
-            m = re.match(r"(\d{1,2}/[A-Za-z]{3}/\d{4}[:\s]\S+)", line)
+            # Apache-style date: 16/Feb/2026:10:17:33 +0000
+            m = re.search(r"(\d{1,2}/[A-Za-z]{3}/\d{4}[:\s]\S+)", line)
         if m:
             timestamp = m.group(1)
 
+        # 1. Extract IP
+        ip = None
+        m_ip = re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", line)
+        if m_ip:
+            ip = m_ip.group(0)
+
+        # 2. Extract Severity
+        line_lower = line.lower()
+        if any(w in line_lower for w in ["fail", "error", "critical", "deny", "block", "attack"]):
+            severity = "HIGH"
+        elif any(w in line_lower for w in ["warn", "suspicious"]):
+            severity = "MEDIUM"
+        else:
+            severity = "LOW"
+
+        # 3. Extract Source
+        if "ssh" in line_lower:
+            source = "ssh"
+        elif any(w in line_lower for w in ["firewall", "ufw", "iptables", "block", "deny"]):
+            source = "firewall"
+        elif re.search(r"\b(?:apache|nginx|http|get|post|put|delete)\b", line_lower):
+            source = "web"
+        else:
+            source = "generic"
+
+        # 4. Extract Action & Resource for rules.py compatibility
+        action = line
+        resource = None
+        if source == "firewall":
+            if "block" in line_lower or "deny" in line_lower:
+                action = "BLOCK"
+            else:
+                action = "ALLOW"
+            m_port = re.search(r"DPT=(\d+)", line) or re.search(r"dst_port=(\d+)", line)
+            if m_port:
+                resource = m_port.group(1)
+
+        # 5. Extract User
+        user = None
+        m_user = re.search(r"(?:user|for|account|uname)[:=]?\s*([a-zA-Z0-9_\-]+)", line_lower)
+        if m_user and m_user.group(1) not in ["to", "from", "for", "the", "a"]:
+            user = m_user.group(1)
+
         events.append(LogEvent(
             timestamp=timestamp,
-            source="generic",
+            source=source,
             event_type="event",
-            severity="LOW",
+            severity=severity,
+            user=user,
+            ip=ip,
+            action=action,
+            resource=resource,
             raw=line
         ))
 
