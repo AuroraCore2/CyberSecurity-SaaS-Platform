@@ -9,10 +9,10 @@ import uvicorn
 from app.main import app
 
 if __name__ == "__main__":
-    print("🚀 Starting ThreatMind Backend (Local Development)...")
-    print("📍 API: http://127.0.0.1:8000")
-    print("📊 Dashboard: http://127.0.0.1:8000/dashboard")
-    print("🔍 Health Check: http://127.0.0.1:8000")
+    print("[SYSTEM] Starting ThreatMind Backend (Local Development)...")
+    print("[API] http://127.0.0.1:8000")
+    print("[DASHBOARD] http://127.0.0.1:8000/dashboard")
+    print("[HEALTH] http://127.0.0.1:8000")
     print("Press Ctrl+C to stop the server")
     print("-" * 50)
 

@@ -6,8 +6,12 @@ from fastapi.staticfiles import StaticFiles
 from app.api import logs, incidents
 from app.storage.database import Base, engine
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Vercel is mostly a read-only environment for Python.
+# Catch sqlite read-only errors on serverless spin-up.
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"Warning: Database creation skipped (Likely read-only environment): {e}")
 
 app = FastAPI(title="ThreatMind backend")
 
