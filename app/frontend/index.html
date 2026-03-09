@@ -878,8 +878,8 @@ async function processFile(file) {
         // 3. Render real data
         renderFromAPI(analytics);
     } catch (err) {
-        alert('Error processing file: ' + err.message);
-        console.error(err);
+        console.error('[ThreatMind] Upload error:', err);
+        showToast('⚠ ' + err.message, 'error');
     } finally {
         document.getElementById('loading-overlay').style.display = 'none';
     }
@@ -1199,9 +1199,23 @@ async function sendChat() {
     btn.disabled = false;
 }
 
+function showToast(msg, type = 'info') {
+    const t = document.createElement('div');
+    const color = type === 'error' ? 'var(--neon-red)' : 'var(--cyber-blue)';
+    t.style.cssText = `position:fixed;bottom:28px;right:28px;z-index:99999;
+        padding:12px 22px;background:rgba(0,0,0,0.92);border:1px solid ${color};
+        color:${color};font-family:'JetBrains Mono';font-size:0.78rem;border-radius:6px;
+        box-shadow:0 0 18px ${color}44;letter-spacing:0.5px;max-width:420px;
+        animation:fadeIn .3s ease;pointer-events:none;`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4500);
+}
+
 function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
+
 
 function quickQuery(q) {
     document.getElementById('chat-input').value = q;
