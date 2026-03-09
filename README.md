@@ -11,7 +11,7 @@ Users can upload system, firewall, or application logs and ThreatMind instantly:
 
 The platform simplifies complex cybersecurity workflows and empowers even non-experts to understand system threats using an intuitive dashboard and chatbot interface.
 
-![ThreatMind UI](https://github.com/user-attachments/assets/95a7090b-06eb-4a16-92bf-0f6f4fa6b2aa)
+<img src="images/ThreatMind.png" width=1000 >
 
 
 ## Project Structure
