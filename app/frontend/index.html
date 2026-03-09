@@ -869,11 +869,16 @@ async function processFile(file) {
         const uploadData = await uploadRes.json();
         if (uploadData.error) throw new Error(uploadData.error);
 
-        // 2. Fetch computed analytics
-        const analyticsRes = await fetch('/logs/analytics');
-        if (!analyticsRes.ok) throw new Error(`Analytics fetch failed: ${analyticsRes.status}`);
-        const analytics = await analyticsRes.json();
-        if (analytics.error) throw new Error(analytics.error);
+        // 2. Use analytics from upload response (when DB is read-only) or fetch from API
+        let analytics;
+        if (uploadData.analytics) {
+            analytics = uploadData.analytics;
+        } else {
+            const analyticsRes = await fetch('/logs/analytics');
+            if (!analyticsRes.ok) throw new Error(`Analytics fetch failed: ${analyticsRes.status}`);
+            analytics = await analyticsRes.json();
+            if (analytics.error) throw new Error(analytics.error);
+        }
 
         // 3. Render real data
         renderFromAPI(analytics);
