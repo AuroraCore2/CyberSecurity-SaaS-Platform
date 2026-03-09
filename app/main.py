@@ -9,7 +9,7 @@ from app.storage.database import Base, engine
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="InsightGuard backend")
+app = FastAPI(title="ThreatMind backend")
 
 app.add_middleware(
     CORSMiddleware,

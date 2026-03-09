@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Local Development Startup Script for InsightGuard
+Local Development Startup Script for ThreatMind
 
 Run this to start the FastAPI server locally:
 python start.py
@@ -9,7 +9,7 @@ import uvicorn
 from app.main import app
 
 if __name__ == "__main__":
-    print("🚀 Starting InsightGuard Backend (Local Development)...")
+    print("🚀 Starting ThreatMind Backend (Local Development)...")
     print("📍 API: http://127.0.0.1:8000")
     print("📊 Dashboard: http://127.0.0.1:8000/dashboard")
     print("🔍 Health Check: http://127.0.0.1:8000")

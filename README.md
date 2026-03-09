@@ -1,9 +1,9 @@
 # CyberSecurity-SaaS-Platform
 
-## INSIGHTGUARD - AI POWERED CYBERSECURITY SAAS PLATFORM
+## THREATMIND - AI POWERED CYBERSECURITY SAAS PLATFORM
 
-InsightGuard is a cybersecurity SaaS platform that combines Data Science, Machine Learning, Threat Intelligence, and Generative AI to automate security log analysis.
-Users can upload system, firewall, or application logs and InsightGuard instantly:
+ThreatMind is a cybersecurity SaaS platform that combines Data Science, Machine Learning, Threat Intelligence, and Generative AI to automate security log analysis.
+Users can upload system, firewall, or application logs and ThreatMind instantly:
 - Extracts and summarizes key events<br>
 - Detects anomalies using ML models<br>
 - Performs threat intelligence on suspicious IPs/domains<br>
@@ -11,13 +11,13 @@ Users can upload system, firewall, or application logs and InsightGuard instantl
 
 The platform simplifies complex cybersecurity workflows and empowers even non-experts to understand system threats using an intuitive dashboard and chatbot interface.
 
-<img width="1866" height="902" alt="image" src="https://github.com/user-attachments/assets/3d8620ee-43af-4704-98a6-9c7d11351c9a" />
+![ThreatMind UI](https://github.com/user-attachments/assets/95a7090b-06eb-4a16-92bf-0f6f4fa6b2aa)
 
 
 ## Project Structure
 
 ```
-insightguard/
+ThreatMind/
 ├── start.py             #  Local development startup script
 ├── app/                 #  Main application directory
 │   ├── main.py          #  FastAPI application & routes
@@ -35,8 +35,9 @@ insightguard/
 │   ├── services/        #  Business logic services
 │   ├── storage/         #  Database configuration
 │   │   └── database.py  #  SQLAlchemy setup
-│   └── Frontend/        #  Static web files
+│   └── frontend/        #  Static web files
 │       └── index.html   #  Dashboard UI
+├── vercel.json          #  Vercel serverless deployment config
 ├── requirements.txt     #  Python dependencies
 └── README.md            #  This file
 ```
@@ -52,7 +53,7 @@ insightguard/
 
 2. **Set up PostgreSQL Database:**
    - Make sure PostgreSQL is running locally
-   - Create database: `InsightGuard`
+   - Create database: `ThreatMind`
    - Update connection string in `app/storage/database.py` if needed
 
 3. **Run the Application:**
