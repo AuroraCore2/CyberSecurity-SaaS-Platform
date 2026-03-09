@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text
 from app.storage.database import Base
 
+
 class LogEvent(Base):
     __tablename__ = "log_events"
 
@@ -14,6 +15,12 @@ class LogEvent(Base):
     action = Column(Text, nullable=True)
     resource = Column(Text, nullable=True)
     raw = Column(Text)
+    # Extended analytics fields
+    status_code = Column(String, nullable=True)
+    user_agent = Column(Text, nullable=True)
+    bytes_sent = Column(Integer, nullable=True)
+    method = Column(String, nullable=True)
+
 
 class Incident(Base):
     __tablename__ = "incidents"

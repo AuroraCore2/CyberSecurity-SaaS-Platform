@@ -594,7 +594,7 @@
                 <h2 class="matrix-text" data-value="DROP LOG FILES HERE" style="margin-bottom:15px; font-family:'Space Grotesk';">DROP LOG FILES HERE</h2>
                 <p style="color:var(--text-low); margin-bottom:28px;">Supports .log, .txt, and .csv files</p>
                 <button class="btn" style="pointer-events:none">BROWSE FILES</button>
-                <input type="file" id="logInput" hidden accept=".log,.txt,.csv" onchange="processFile(this.files[0])">
+                <input type="file" id="logInput" hidden accept=".log,.txt,.csv,.json" onchange="processFile(this.files[0])">
             </div>
             <div style="text-align:center; margin-top:20px;">
                 <span style="color:var(--text-low); font-family:'JetBrains Mono'; font-size:0.75rem; letter-spacing:2px;">OR</span>
@@ -849,199 +849,285 @@ function resetTilt(card) { card.style.transform='perspective(1000px) rotateX(0de
 // ============================================================
 // DASHBOARD
 // ============================================================
+// ============================================================
+// DASHBOARD — API-DRIVEN ANALYTICS
+// ============================================================
 let charts = {};
 
-function processFile(file) {
+// ── Upload file → backend → analytics → render ───────────────────────────────
+async function processFile(file) {
     document.getElementById('loading-overlay').style.display = 'flex';
-    setTimeout(() => {
-        const reader = new FileReader();
-        reader.onload = e => {
-            setTimeout(() => {
-                renderDashboard(parseLines(e.target.result.split('\n').filter(l=>l.trim())));
-                document.getElementById('loading-overlay').style.display = 'none';
-            }, 50);
-        };
-        reader.readAsText(file);
-    }, 50);
-}
-
-function parseLines(lines) {
-    // Optimize by allocating array directly and using manual loop instead of array methods
-    const len = lines.length;
-    let results = [];
-    const nowStr = new Date().toISOString().slice(0,19).replace('T',' ');
-    
-    for (let i = 0; i < len; i++) {
-        const line = lines[i];
-        if (!line) continue;
-        
-        let ip='N/A', method='GET', endpoint='/', status='200', severity='LOW', timestamp='';
-        
-        if (line.includes(',')) {
-            const csv = line.split(',');
-            if (csv.length >= 5) {
-                timestamp = csv[0]?.trim() || '';
-                ip = csv[1]?.trim() || 'N/A';
-                method = csv[2]?.trim() || 'GET';
-                endpoint = csv[3]?.trim() || '/';
-                status = csv[4]?.trim() || '200';
-                severity = (csv[5]?.trim() || guessSev(status)).toUpperCase();
-                results.push({ timestamp, ip, method, endpoint, status, severity });
-                continue;
-            }
+    try {
+        // 1. Upload file to backend
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await fetch('/logs/upload', { method: 'POST', body: formData });
+        if (!uploadRes.ok) {
+            const err = await uploadRes.json().catch(() => ({}));
+            throw new Error(err.error || `Upload failed: ${uploadRes.status}`);
         }
-        
-        const p = line.trim().split(/\s+/);
-        if (p.length >= 5) {
-            timestamp = p[0] + ' ' + p[1];
-            ip = p[2] || 'N/A';
-            method = p[3] || 'GET';
-            endpoint = p[4] || '/';
-            status = p[5] || '200';
-            severity = (p[6] || guessSev(status)).toUpperCase();
-            results.push({ timestamp, ip, method, endpoint, status, severity });
-            continue;
-        }
+        const uploadData = await uploadRes.json();
+        if (uploadData.error) throw new Error(uploadData.error);
 
-        results.push({ 
-            timestamp: nowStr, 
-            ip: 'N/A', 
-            method: 'EVENT', 
-            endpoint: line.slice(0,40), 
-            status: 'INFO', 
-            severity: 'LOW' 
-        });
+        // 2. Fetch computed analytics
+        const analyticsRes = await fetch('/logs/analytics');
+        if (!analyticsRes.ok) throw new Error(`Analytics fetch failed: ${analyticsRes.status}`);
+        const analytics = await analyticsRes.json();
+        if (analytics.error) throw new Error(analytics.error);
+
+        // 3. Render real data
+        renderFromAPI(analytics);
+    } catch (err) {
+        alert('Error processing file: ' + err.message);
+        console.error(err);
+    } finally {
+        document.getElementById('loading-overlay').style.display = 'none';
     }
-    return results;
 }
 
-function guessSev(s) {
-    if(!s) return 'LOW';
-    if(['403','500','401'].includes(String(s))) return 'CRITICAL';
-    if(['404','429'].includes(String(s))) return 'MEDIUM';
-    return 'LOW';
+// ── Render dashboard from API analytics object ────────────────────────────────
+function renderFromAPI(data) {
+    showPage('dashboard');
+    document.getElementById('upload-view').style.display = 'none';
+    document.getElementById('results-view').style.display = 'block';
+
+    // Stat cards
+    document.getElementById('stat-total').textContent = (data.total_events || 0).toLocaleString();
+    document.getElementById('stat-crit').textContent  = (data.critical_threats || 0).toLocaleString();
+    document.getElementById('stat-ips').textContent   = (data.unique_attackers || 0).toLocaleString();
+
+    const respEl = document.getElementById('stat-resp');
+    if (data.avg_response_time_ms != null)
+        respEl.textContent = data.avg_response_time_ms.toFixed(1) + 'ms';
+    else
+        respEl.textContent = 'N/A';
+
+    const health = data.system_health != null ? data.system_health : 100;
+    const hEl = document.getElementById('stat-health');
+    if (health > 90)       { hEl.textContent = health.toFixed(1) + '% [ SAFE ]';    hEl.style.color = '#00ff88'; }
+    else if (health > 70)  { hEl.textContent = health.toFixed(1) + '% [ WARNING ]'; hEl.style.color = '#ffcc00'; }
+    else                   { hEl.textContent = health.toFixed(1) + '% [ RISK ]';    hEl.style.color = 'var(--neon-red)'; }
+
+    // Forensics table
+    const rows = data.forensics_table || [];
+    let htmlChunk = '';
+    for (const r of rows) {
+        const s   = (r.severity || 'LOW').toUpperCase();
+        const cls = s === 'CRITICAL' ? 'sev-critical' : s === 'HIGH' ? 'sev-high' : s === 'MEDIUM' ? 'sev-medium' : 'sev-low';
+        const ipCol = (s === 'CRITICAL' || s === 'HIGH') ? 'color:var(--neon-red)' : '';
+        htmlChunk += `<tr><td style="color:#555">${escHtml(r.timestamp||'')}</td><td style="${ipCol}">${escHtml(r.ip||'N/A')}</td><td>${escHtml(r.method||'—')}</td><td style="color:#999">${escHtml(r.endpoint||'—')}</td><td>${escHtml(r.status||'—')}</td><td><span class="sev-badge ${cls}">${s}</span></td></tr>`;
+    }
+    document.getElementById('log-tbody').innerHTML = htmlChunk;
+    document.getElementById('table-count').textContent = `${data.total_events.toLocaleString()} EVENTS${data.total_events > 100 ? ' — SHOWING LATEST 100' : ''}`;
+
+    // Build all 10 charts
+    buildChartsFromAPI(data);
 }
 
+// ── Build charts from API data ────────────────────────────────────────────────
+function buildChartsFromAPI(d) {
+    const base = {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#444', font: { size: 10 } } },
+            x: { grid: { display: false },                  ticks: { color: '#444', font: { size: 10 } } }
+        }
+    };
+    const donut = {
+        maintainAspectRatio: false, cutout: '68%',
+        plugins: { legend: { position: 'bottom', labels: { color: '#555', font: { size: 9, family: 'JetBrains Mono' }, padding: 10 } } }
+    };
+    Object.values(charts).forEach(c => c?.destroy?.());
+    const g = id => document.getElementById(id).getContext('2d');
+
+    // 1. Traffic Analysis (line)
+    const ta = d.traffic_analysis || {};
+    charts.main = new Chart(g('mainChart'), {
+        type: 'line',
+        data: { labels: ta.labels || [], datasets: [{ data: ta.values || [], borderColor: '#ff003c', tension: 0.4, fill: true, backgroundColor: 'rgba(255,0,60,0.05)', pointBackgroundColor: '#ff003c', pointRadius: 3 }] },
+        options: base
+    });
+
+    // 2. Risk Distribution (doughnut)
+    const rd = d.risk_distribution || {};
+    charts.risk = new Chart(g('riskChart'), {
+        type: 'doughnut',
+        data: { labels: ['Low', 'Medium', 'High', 'Critical'], datasets: [{ data: [rd.LOW||0, rd.MEDIUM||0, rd.HIGH||0, rd.CRITICAL||0], backgroundColor: ['#00f2ff', '#ffcc00', '#ff5000', '#ff003c'], borderWidth: 0 }] },
+        options: donut
+    });
+
+    // 3. Attack Vectors (bar)
+    const av = d.attack_vectors || {};
+    charts.vector = new Chart(g('vectorChart'), {
+        type: 'bar',
+        data: { labels: av.labels || [], datasets: [{ data: av.values || [], backgroundColor: 'rgba(255,0,60,0.7)', borderColor: '#ff003c', borderWidth: 1 }] },
+        options: base
+    });
+
+    // 4. Geographic Origins (doughnut)
+    const geoColors = ['#00f2ff','#ff003c','rgba(255,255,255,0.6)','#ffcc00','#ff5000','#7700ff','#222'];
+    const go = d.geographic_origins || {};
+    charts.geo = new Chart(g('geoChart'), {
+        type: 'doughnut',
+        data: { labels: go.labels || [], datasets: [{ data: go.values || [], backgroundColor: geoColors.slice(0, (go.labels||[]).length), borderWidth: 0 }] },
+        options: donut
+    });
+
+    // 5. Protocol Breakdown (pie)
+    const protoColors = ['#00f2ff','#0066cc','#ff003c','rgba(255,255,255,0.5)','#333','#ffcc00'];
+    const pb = d.protocol_breakdown || {};
+    charts.proto = new Chart(g('protocolChart'), {
+        type: 'pie',
+        data: { labels: pb.labels || [], datasets: [{ data: pb.values || [], backgroundColor: protoColors.slice(0, (pb.labels||[]).length), borderWidth: 0 }] },
+        options: donut
+    });
+
+    // 6. Hourly Threat Density (line)
+    const ht = d.hourly_threat_density || {};
+    charts.density = new Chart(g('densityChart'), {
+        type: 'line',
+        data: { labels: ht.labels || [], datasets: [{ label: 'Threats', data: ht.values || [], borderColor: '#ffcc00', backgroundColor: 'rgba(255,204,0,0.05)', tension: 0.4, fill: true }] },
+        options: base
+    });
+
+    // 7. Top Targeted Endpoints (radar)
+    const te = d.top_endpoints || {};
+    const radarOpts = {
+        maintainAspectRatio: false,
+        scales: { r: { angleLines: { color: 'rgba(255,255,255,0.07)' }, grid: { color: 'rgba(255,255,255,0.07)' }, pointLabels: { color: 'rgba(200,220,255,0.35)', font: { size: 9 } }, ticks: { display: false } } },
+        plugins: { legend: { display: false } }
+    };
+    charts.endpoint = new Chart(g('endpointChart'), {
+        type: 'radar',
+        data: { labels: (te.labels || []).map(l => l.slice(0, 14)), datasets: [{ data: te.values || [], backgroundColor: 'rgba(0,242,255,0.12)', borderColor: '#00f2ff', pointBackgroundColor: '#ff003c', borderWidth: 2 }] },
+        options: radarOpts
+    });
+
+    // 8. User Agent Analysis (doughnut)
+    const uaColors = ['#00f2ff','#ff003c','rgba(255,255,255,0.65)','#222','#ffcc00','#7700ff'];
+    const ua = d.user_agent_analysis || {};
+    charts.ua = new Chart(g('uaChart'), {
+        type: 'doughnut',
+        data: { labels: ua.labels || [], datasets: [{ data: ua.values || [], backgroundColor: uaColors.slice(0, (ua.labels||[]).length), borderWidth: 0 }] },
+        options: donut
+    });
+
+    // 9. Response Code Distribution (pie)
+    const rcColors = ['#00f2ff','#00ff88','#ffcc00','#ff5000','#ff003c','#556','#333','#7700ff'];
+    const rc = d.response_codes || {};
+    charts.response = new Chart(g('responseChart'), {
+        type: 'pie',
+        data: { labels: rc.labels || [], datasets: [{ data: rc.values || [], backgroundColor: rcColors.slice(0, (rc.labels||[]).length), borderWidth: 0 }] },
+        options: donut
+    });
+
+    // 10. Bandwidth Usage (line)
+    const bw = d.bandwidth_usage || {};
+    charts.bw = new Chart(g('bandwidthChart'), {
+        type: 'line',
+        data: { labels: bw.labels || [], datasets: [{ data: bw.values || [], borderColor: '#00f2ff', backgroundColor: 'rgba(0,242,255,0.04)', tension: 0.3, fill: true }] },
+        options: base
+    });
+}
+
+// ── Demo mode (pure client-side, no API needed) ───────────────────────────────
 function loadDemo() {
-    const demo = [
-        {timestamp:'2024-02-10 10:01:05',ip:'192.168.1.10',method:'POST',endpoint:'/login',status:'200',severity:'LOW'},
-        {timestamp:'2024-02-10 10:01:08',ip:'45.33.22.11',method:'GET',endpoint:'/wp-admin',status:'403',severity:'CRITICAL'},
-        {timestamp:'2024-02-10 10:01:09',ip:'45.33.22.11',method:'POST',endpoint:'/xmlrpc.php',status:'403',severity:'CRITICAL'},
-        {timestamp:'2024-02-10 10:02:15',ip:'104.21.44.2',method:'GET',endpoint:'/api/data',status:'200',severity:'LOW'},
-        {timestamp:'2024-02-10 10:02:20',ip:'198.51.100.55',method:'GET',endpoint:'/etc/passwd',status:'500',severity:'CRITICAL'},
-        {timestamp:'2024-02-10 10:03:01',ip:'192.168.1.12',method:'GET',endpoint:'/assets/logo.png',status:'200',severity:'LOW'},
-        {timestamp:'2024-02-10 10:03:45',ip:'185.12.33.44',method:'POST',endpoint:'/api/v1/upload',status:'201',severity:'LOW'},
-        {timestamp:'2024-02-10 10:04:12',ip:'45.33.22.11',method:'GET',endpoint:'/config.php',status:'403',severity:'CRITICAL'},
-        {timestamp:'2024-02-10 10:04:55',ip:'91.108.4.177',method:'GET',endpoint:'/.env',status:'403',severity:'CRITICAL'},
-        {timestamp:'2024-02-10 10:05:10',ip:'192.168.1.15',method:'PUT',endpoint:'/api/users/99',status:'401',severity:'HIGH'},
-        {timestamp:'2024-02-10 10:05:30',ip:'10.0.0.5',method:'GET',endpoint:'/dashboard',status:'200',severity:'LOW'},
-        {timestamp:'2024-02-10 10:06:01',ip:'45.33.22.11',method:'GET',endpoint:'/phpmyadmin',status:'404',severity:'MEDIUM'},
-        {timestamp:'2024-02-10 10:06:44',ip:'172.16.0.22',method:'POST',endpoint:'/auth/token',status:'200',severity:'LOW'},
-        {timestamp:'2024-02-10 10:07:12',ip:'203.0.113.42',method:'GET',endpoint:'/admin/shell',status:'403',severity:'CRITICAL'},
-        {timestamp:'2024-02-10 10:07:55',ip:'192.168.1.10',method:'GET',endpoint:'/user/profile',status:'200',severity:'LOW'},
-        {timestamp:'2024-02-10 10:08:20',ip:'198.51.100.55',method:'POST',endpoint:'/search?q=<script>',status:'400',severity:'HIGH'},
-        {timestamp:'2024-02-10 10:08:45',ip:'185.12.33.44',method:'GET',endpoint:'/wp-login.php',status:'200',severity:'MEDIUM'},
-        {timestamp:'2024-02-10 10:09:01',ip:'45.33.22.11',method:'POST',endpoint:'/api/exec',status:'500',severity:'CRITICAL'},
-        {timestamp:'2024-02-10 10:09:30',ip:'10.0.0.1',method:'GET',endpoint:'/health',status:'200',severity:'LOW'},
-        {timestamp:'2024-02-10 10:10:05',ip:'91.108.4.177',method:'POST',endpoint:'/upload.php',status:'200',severity:'HIGH'},
-        {timestamp:'2024-02-10 10:10:40',ip:'104.21.44.2',method:'GET',endpoint:'/api/v2/users',status:'200',severity:'LOW'},
-        {timestamp:'2024-02-10 10:11:05',ip:'203.0.113.99',method:'GET',endpoint:'/etc/shadow',status:'403',severity:'CRITICAL'},
-        {timestamp:'2024-02-10 10:11:22',ip:'192.168.1.20',method:'DELETE',endpoint:'/api/records/bulk',status:'401',severity:'HIGH'},
-        {timestamp:'2024-02-10 10:12:00',ip:'172.16.0.50',method:'GET',endpoint:'/report/export',status:'200',severity:'LOW'},
-        {timestamp:'2024-02-10 10:12:35',ip:'45.33.22.11',method:'GET',endpoint:'/backup.sql',status:'403',severity:'CRITICAL'},
-        {timestamp:'2024-02-10 10:13:01',ip:'185.220.101.5',method:'POST',endpoint:'/login',status:'401',severity:'MEDIUM'},
-        {timestamp:'2024-02-10 10:13:20',ip:'185.220.101.5',method:'POST',endpoint:'/login',status:'401',severity:'MEDIUM'},
-        {timestamp:'2024-02-10 10:13:39',ip:'185.220.101.5',method:'POST',endpoint:'/login',status:'401',severity:'MEDIUM'},
-        {timestamp:'2024-02-10 10:14:00',ip:'185.220.101.5',method:'POST',endpoint:'/login',status:'200',severity:'CRITICAL'},
-        {timestamp:'2024-02-10 10:14:30',ip:'192.168.1.10',method:'GET',endpoint:'/static/app.js',status:'200',severity:'LOW'},
+    const demoRows = [
+        {timestamp:'2024-02-10 10:01:05',ip:'192.168.1.10', method:'POST',  endpoint:'/login',           status:'200', severity:'LOW'},
+        {timestamp:'2024-02-10 10:01:08',ip:'45.33.22.11',  method:'GET',   endpoint:'/wp-admin',         status:'403', severity:'CRITICAL'},
+        {timestamp:'2024-02-10 10:01:09',ip:'45.33.22.11',  method:'POST',  endpoint:'/xmlrpc.php',       status:'403', severity:'CRITICAL'},
+        {timestamp:'2024-02-10 10:02:15',ip:'104.21.44.2',  method:'GET',   endpoint:'/api/data',         status:'200', severity:'LOW'},
+        {timestamp:'2024-02-10 10:02:20',ip:'198.51.100.55',method:'GET',   endpoint:'/etc/passwd',       status:'500', severity:'CRITICAL'},
+        {timestamp:'2024-02-10 10:03:01',ip:'192.168.1.12', method:'GET',   endpoint:'/assets/logo.png',  status:'200', severity:'LOW'},
+        {timestamp:'2024-02-10 10:03:45',ip:'185.12.33.44', method:'POST',  endpoint:'/api/v1/upload',    status:'201', severity:'LOW'},
+        {timestamp:'2024-02-10 10:04:12',ip:'45.33.22.11',  method:'GET',   endpoint:'/config.php',       status:'403', severity:'CRITICAL'},
+        {timestamp:'2024-02-10 10:04:55',ip:'91.108.4.177', method:'GET',   endpoint:'/.env',             status:'403', severity:'CRITICAL'},
+        {timestamp:'2024-02-10 10:05:10',ip:'192.168.1.15', method:'PUT',   endpoint:'/api/users/99',     status:'401', severity:'HIGH'},
+        {timestamp:'2024-02-10 10:05:30',ip:'10.0.0.5',     method:'GET',   endpoint:'/dashboard',        status:'200', severity:'LOW'},
+        {timestamp:'2024-02-10 10:06:01',ip:'45.33.22.11',  method:'GET',   endpoint:'/phpmyadmin',       status:'404', severity:'MEDIUM'},
+        {timestamp:'2024-02-10 10:06:44',ip:'172.16.0.22',  method:'POST',  endpoint:'/auth/token',       status:'200', severity:'LOW'},
+        {timestamp:'2024-02-10 10:07:12',ip:'203.0.113.42', method:'GET',   endpoint:'/admin/shell',      status:'403', severity:'CRITICAL'},
+        {timestamp:'2024-02-10 10:07:55',ip:'192.168.1.10', method:'GET',   endpoint:'/user/profile',     status:'200', severity:'LOW'},
+        {timestamp:'2024-02-10 10:08:20',ip:'198.51.100.55',method:'POST',  endpoint:'/search?q=<script>',status:'400', severity:'HIGH'},
+        {timestamp:'2024-02-10 10:08:45',ip:'185.12.33.44', method:'GET',   endpoint:'/wp-login.php',     status:'200', severity:'MEDIUM'},
+        {timestamp:'2024-02-10 10:09:01',ip:'45.33.22.11',  method:'POST',  endpoint:'/api/exec',         status:'500', severity:'CRITICAL'},
+        {timestamp:'2024-02-10 10:09:30',ip:'10.0.0.1',     method:'GET',   endpoint:'/health',           status:'200', severity:'LOW'},
+        {timestamp:'2024-02-10 10:10:05',ip:'91.108.4.177', method:'POST',  endpoint:'/upload.php',       status:'200', severity:'HIGH'},
+        {timestamp:'2024-02-10 10:10:40',ip:'104.21.44.2',  method:'GET',   endpoint:'/api/v2/users',     status:'200', severity:'LOW'},
+        {timestamp:'2024-02-10 10:11:05',ip:'203.0.113.99', method:'GET',   endpoint:'/etc/shadow',       status:'403', severity:'CRITICAL'},
+        {timestamp:'2024-02-10 10:11:22',ip:'192.168.1.20', method:'DELETE',endpoint:'/api/records/bulk', status:'401', severity:'HIGH'},
+        {timestamp:'2024-02-10 10:12:00',ip:'172.16.0.50',  method:'GET',   endpoint:'/report/export',    status:'200', severity:'LOW'},
+        {timestamp:'2024-02-10 10:12:35',ip:'45.33.22.11',  method:'GET',   endpoint:'/backup.sql',       status:'403', severity:'CRITICAL'},
+        {timestamp:'2024-02-10 10:13:01',ip:'185.220.101.5',method:'POST',  endpoint:'/login',            status:'401', severity:'MEDIUM'},
+        {timestamp:'2024-02-10 10:13:20',ip:'185.220.101.5',method:'POST',  endpoint:'/login',            status:'401', severity:'MEDIUM'},
+        {timestamp:'2024-02-10 10:13:39',ip:'185.220.101.5',method:'POST',  endpoint:'/login',            status:'401', severity:'MEDIUM'},
+        {timestamp:'2024-02-10 10:14:00',ip:'185.220.101.5',method:'POST',  endpoint:'/login',            status:'200', severity:'CRITICAL'},
+        {timestamp:'2024-02-10 10:14:30',ip:'192.168.1.10', method:'GET',   endpoint:'/static/app.js',    status:'200', severity:'LOW'},
     ];
+
+    // Compute analytics client-side from demo rows
+    const sevCount = {LOW:0,MEDIUM:0,HIGH:0,CRITICAL:0};
+    const epCount  = {};
+    const stCount  = {};
+    const attackerIPs = new Set();
+    demoRows.forEach(r => {
+        const s = r.severity.toUpperCase();
+        sevCount[s] = (sevCount[s]||0)+1;
+        epCount[r.endpoint]  = (epCount[r.endpoint]||0)+1;
+        stCount[r.status]    = (stCount[r.status]||0)+1;
+        if (s==='CRITICAL'||s==='HIGH') attackerIPs.add(r.ip);
+    });
+    const total = demoRows.length;
+    const critTotal = sevCount.HIGH + sevCount.CRITICAL;
+    const health = Math.max(0, 100 - (critTotal/total*100));
+
+    const n = Math.min(10, total);
+    const tLabels = [], tVals = [];
+    for (let i=0;i<n;i++){tLabels.push(`T${i+1}`);tVals.push(Math.floor(total/n));}
+
+    const topEP = Object.entries(epCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    const topSt = Object.entries(stCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+    // Attack vector classification for demo data
+    const avLabels = ['BruteForce','Path Traversal','Scanner','XSS','RCE','DDoS'];
+    const avVals   = [6, 4, 5, 2, 2, 1];
+
+    const analyticsDemo = {
+        total_events:        total,
+        critical_threats:    critTotal,
+        unique_attackers:    attackerIPs.size,
+        avg_response_time_ms: 42.0,
+        system_health:       parseFloat(health.toFixed(1)),
+        traffic_analysis:    { labels: tLabels, values: tVals },
+        risk_distribution:   { LOW: sevCount.LOW, MEDIUM: sevCount.MEDIUM, HIGH: sevCount.HIGH, CRITICAL: sevCount.CRITICAL },
+        attack_vectors:      { labels: avLabels, values: avVals },
+        geographic_origins:  { labels: ['Internal','US/NA','EU/NA','Other'], values: [8, 11, 6, 5] },
+        protocol_breakdown:  { labels: ['HTTP','HTTPS','SSH','Other'],       values: [20, 6, 2, 2] },
+        hourly_threat_density: {
+            labels: ['00:00','03:00','06:00','09:00','12:00','15:00','18:00','21:00'],
+            values: [1,3,2,8,12,9,4,2]
+        },
+        top_endpoints:       { labels: topEP.map(e=>e[0].slice(0,14)), values: topEP.map(e=>e[1]) },
+        user_agent_analysis: { labels: ['Chrome','Firefox','Bot/Scanner','Other'], values: [10,5,9,6] },
+        response_codes:      { labels: topSt.map(s=>s[0]), values: topSt.map(s=>s[1]) },
+        bandwidth_usage:     { labels: ['1s','2s','3s','4s','5s','6s','7s','8s'], values: [0.04,0.06,0.05,0.08,0.07,0.09,0.06,0.05] },
+        forensics_table:     demoRows.map(r => ({ timestamp:r.timestamp, ip:r.ip, method:r.method, endpoint:r.endpoint, status:r.status, severity:r.severity })),
+    };
+
     document.getElementById('loading-overlay').style.display = 'flex';
     setTimeout(() => {
-        showPage('dashboard');
-        renderDashboard(demo);
+        renderFromAPI(analyticsDemo);
         document.getElementById('loading-overlay').style.display = 'none';
     }, 600);
 }
 
-function renderDashboard(rows) {
-    document.getElementById('upload-view').style.display='none';
-    document.getElementById('results-view').style.display='block';
-
-    let low=0,med=0,crit=0,high=0;
-    const ips=new Set(), endpoints={}, statuses={};
-    rows.forEach(r=>{
-        const s=(r.severity||'LOW').toUpperCase();
-        if(s==='CRITICAL') crit++;
-        else if(s==='HIGH') high++;
-        else if(s==='MEDIUM') med++;
-        else low++;
-        if(r.ip&&r.ip!=='N/A'&&(s==='CRITICAL'||s==='HIGH')) ips.add(r.ip);
-        endpoints[r.endpoint]=(endpoints[r.endpoint]||0)+1;
-        statuses[r.status]=(statuses[r.status]||0)+1;
-    });
-
-    const total=rows.length, critTotal=crit+high;
-    const health=total>0?Math.max(0,100-(critTotal/total*100)):100;
-
-    document.getElementById('stat-total').textContent=total.toLocaleString();
-    document.getElementById('stat-crit').textContent=critTotal.toLocaleString();
-    document.getElementById('stat-ips').textContent=ips.size.toLocaleString();
-
-    const hEl=document.getElementById('stat-health');
-    if(health>90){hEl.textContent=health.toFixed(1)+'% [ SAFE ]';hEl.style.color='#00ff88';}
-    else if(health>70){hEl.textContent=health.toFixed(1)+'% [ WARNING ]';hEl.style.color='#ffcc00';}
-    else{hEl.textContent=health.toFixed(1)+'% [ RISK ]';hEl.style.color='var(--neon-red)';}
-
-    // Table
-    const tbody=document.getElementById('log-tbody');
-    // Instead of using costly innerHTML in a loop, build a large string
-    let htmlChunk = '';
-    // Only render the first 100 rows to DOM to save browser memory/CPU
-    const maxRender = Math.min(rows.length, 100);
-    
-    for(let i=0; i<maxRender; i++){
-        const r = rows[i];
-        const s = (r.severity||'LOW').toUpperCase();
-        const cls=s==='CRITICAL'?'sev-critical':s==='HIGH'?'sev-high':s==='MEDIUM'?'sev-medium':'sev-low';
-        const ipCol=(s==='CRITICAL'||s==='HIGH')?'color:var(--neon-red)':'';
-        htmlChunk += `<tr><td style="color:#555">${r.timestamp}</td><td style="${ipCol}">${r.ip}</td><td>${r.method}</td><td style="color:#999">${r.endpoint}</td><td>${r.status}</td><td><span class="sev-badge ${cls}">${s}</span></td></tr>`;
-    }
-    tbody.innerHTML = htmlChunk;
-    document.getElementById('table-count').textContent=`${rows.length.toLocaleString()} EVENTS${rows.length>25?' — SCROLL TO VIEW ALL':''}`;
-
-    // Charts data
-    const buckets=Math.min(8,Math.max(2,rows.length));
-    const tL=[],tV=[];
-    for(let i=0;i<buckets;i++){const s=Math.floor(i*rows.length/buckets),e=Math.floor((i+1)*rows.length/buckets);tL.push(`T${i+1}`);tV.push(e-s);}
-    const topEP=Object.entries(endpoints).sort((a,b)=>b[1]-a[1]).slice(0,5);
-    buildCharts({low,med,crit,high,tL,tV,topEP,statuses});
-}
-
-function buildCharts({low,med,crit,high,tL,tV,topEP,statuses}) {
-    const base={maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#444',font:{size:10}}},x:{grid:{display:false},ticks:{color:'#444',font:{size:10}}}}};
-    const donut={maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom',labels:{color:'#555',font:{size:9,family:'JetBrains Mono'},padding:10}}}};
-    Object.values(charts).forEach(c=>c?.destroy?.());
-    const g=id=>document.getElementById(id).getContext('2d');
-
-    charts.main=new Chart(g('mainChart'),{type:'line',data:{labels:tL,datasets:[{data:tV,borderColor:'#ff003c',tension:0.4,fill:true,backgroundColor:'rgba(255,0,60,0.05)',pointBackgroundColor:'#ff003c',pointRadius:3}]},options:base});
-    charts.risk=new Chart(g('riskChart'),{type:'doughnut',data:{labels:['Low','Medium','High','Critical'],datasets:[{data:[low,med,high,crit],backgroundColor:['#00f2ff','#ffcc00','#ff5000','#ff003c'],borderWidth:0}]},options:donut});
-    charts.vector=new Chart(g('vectorChart'),{type:'bar',data:{labels:['SQLi','XSS','DDoS','BruteForce','RCE','CSRF'],datasets:[{data:[12,9,20,15,8,5],backgroundColor:'rgba(255,0,60,0.7)',borderColor:'#ff003c',borderWidth:1}]},options:base});
-    charts.geo=new Chart(g('geoChart'),{type:'doughnut',data:{labels:['US','CN','RU','DE','Unknown'],datasets:[{data:[40,20,15,10,15],backgroundColor:['#00f2ff','#ff003c','rgba(255,255,255,0.6)','#555','#222'],borderWidth:0}]},options:donut});
-    charts.proto=new Chart(g('protocolChart'),{type:'pie',data:{labels:['HTTPS','HTTP','SSH','FTP','Other'],datasets:[{data:[65,22,7,4,2],backgroundColor:['#00f2ff','#0066cc','#ff003c','rgba(255,255,255,0.5)','#333'],borderWidth:0}]},options:donut});
-    charts.density=new Chart(g('densityChart'),{type:'line',data:{labels:['00','03','06','09','12','15','18','21'],datasets:[{label:'Threats',data:[3,8,5,22,38,42,19,11],borderColor:'#ffcc00',backgroundColor:'rgba(255,204,0,0.05)',tension:0.4,fill:true}]},options:base});
-    charts.endpoint=new Chart(g('endpointChart'),{type:'radar',data:{labels:topEP.map(e=>e[0].slice(0,12)),datasets:[{data:topEP.map(e=>e[1]),backgroundColor:'rgba(0,242,255,0.12)',borderColor:'#00f2ff',pointBackgroundColor:'#ff003c',borderWidth:2}]},options:{maintainAspectRatio:false,scales:{r:{angleLines:{color:'rgba(255,255,255,0.07)'},grid:{color:'rgba(255,255,255,0.07)'},pointLabels:{color:'rgba(200,220,255,0.35)',font:{size:9}},ticks:{display:false}}},plugins:{legend:{display:false}}}});
-    const stL=Object.keys(statuses).slice(0,5), stV=stL.map(k=>statuses[k]);
-    charts.response=new Chart(g('responseChart'),{type:'pie',data:{labels:stL.length?stL:['200','404','403','500'],datasets:[{data:stV.length?stV:[78,12,6,4],backgroundColor:['#00f2ff','#556','#ff003c','#ffcc00','#333'],borderWidth:0}]},options:donut});
-    charts.ua=new Chart(g('uaChart'),{type:'doughnut',data:{labels:['Chrome','Firefox','Safari','Bots','Other'],datasets:[{data:[44,24,18,10,4],backgroundColor:['#00f2ff','#ff003c','rgba(255,255,255,0.65)','#222','#444'],borderWidth:0}]},options:donut});
-    charts.bw=new Chart(g('bandwidthChart'),{type:'line',data:{labels:['1s','2s','3s','4s','5s','6s','7s','8s'],datasets:[{data:[42,58,51,74,67,80,61,55],borderColor:'#00f2ff',backgroundColor:'rgba(0,242,255,0.04)',tension:0.3,fill:true}]},options:base});
-}
-
 // Drag & Drop
-const dz=document.getElementById('drop-zone');
-if(dz){
-    ['dragenter','dragover'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.style.borderColor='var(--neon-red)';dz.style.background='rgba(255,0,60,0.08)';}));
-    ['dragleave','drop'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.style.borderColor='';dz.style.background='';}));
-    dz.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)processFile(f);});
+const dz = document.getElementById('drop-zone');
+if (dz) {
+    ['dragenter','dragover'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.style.borderColor='var(--neon-red)'; dz.style.background='rgba(255,0,60,0.08)'; }));
+    ['dragleave','drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.style.borderColor=''; dz.style.background=''; }));
+    dz.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) processFile(f); });
 }
 
 // ============================================================
