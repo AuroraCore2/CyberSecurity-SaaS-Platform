@@ -923,7 +923,7 @@ function renderFromAPI(data) {
         htmlChunk += `<tr><td style="color:#555">${escHtml(r.timestamp||'')}</td><td style="${ipCol}">${escHtml(r.ip||'N/A')}</td><td>${escHtml(r.method||'—')}</td><td style="color:#999">${escHtml(r.endpoint||'—')}</td><td>${escHtml(r.status||'—')}</td><td><span class="sev-badge ${cls}">${s}</span></td></tr>`;
     }
     document.getElementById('log-tbody').innerHTML = htmlChunk;
-    document.getElementById('table-count').textContent = `${data.total_events.toLocaleString()} EVENTS${data.total_events > 100 ? ' — SHOWING LATEST 100' : ''}`;
+    document.getElementById('table-count').textContent = `${data.total_events.toLocaleString()} EVENTS`;
 
     // Build all 10 charts
     buildChartsFromAPI(data);
@@ -1117,7 +1117,7 @@ function loadDemo() {
         user_agent_analysis: { labels: ['Chrome','Firefox','Bot/Scanner','Other'], values: [10,5,9,6] },
         response_codes:      { labels: topSt.map(s=>s[0]), values: topSt.map(s=>s[1]) },
         bandwidth_usage:     { labels: ['1s','2s','3s','4s','5s','6s','7s','8s'], values: [0.04,0.06,0.05,0.08,0.07,0.09,0.06,0.05] },
-        forensics_table:     demoRows.map(r => ({ timestamp:r.timestamp, ip:r.ip, method:r.method, endpoint:r.endpoint, status:r.status, severity:r.severity })),
+        forensics_table:     [...demoRows].sort((a,b) => ({CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1}[b.severity]||0) - ({CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1}[a.severity]||0)).map(r => ({ timestamp:r.timestamp, ip:r.ip, method:r.method, endpoint:r.endpoint, status:r.status, severity:r.severity })),
     };
 
     document.getElementById('loading-overlay').style.display = 'flex';
