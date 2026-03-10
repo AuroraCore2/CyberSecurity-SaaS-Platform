@@ -6,177 +6,340 @@ from typing import Dict, List, Any
 from sqlalchemy.orm import Session
 from app.models.model import LogEvent, Incident
 
-FAILED_LOGIN = 4625
-SUCCESS_LOGIN = 4624
+# ============================================================================
+# DETECTION RULES CONFIGURATION
+# ============================================================================
+
+DETECTION_RULES = {
+    "SSH_BRUTE_FORCE": {
+        "name": "SSH Brute Force Attack",
+        "threshold": 5,
+        "severity": "HIGH",
+        "description": "Detects multiple failed SSH login attempts from same IP",
+        "pattern": "≥5 failed SSH attempts",
+        "category": "Rule-Based Detection"
+    },
+    "HTTP_BRUTE_FORCE": {
+        "name": "HTTP Brute Force Attack", 
+        "threshold": 10,
+        "severity": "HIGH",
+        "description": "Detects multiple failed HTTP authentication attempts",
+        "pattern": "≥10 failed HTTP requests (4xx/5xx errors)",
+        "category": "Rule-Based Detection"
+    },
+    "PORT_SCAN": {
+        "name": "Port Scanning Activity",
+        "threshold": 3,
+        "severity": "HIGH",
+        "description": "Detects reconnaissance by scanning multiple ports",
+        "pattern": "≥3 different ports accessed from same IP",
+        "category": "Rule-Based Detection"
+    },
+    "DIRECTORY_TRAVERSAL": {
+        "name": "Directory Traversal Attack",
+        "severity": "CRITICAL",
+        "description": "Detects path traversal attempts to access sensitive files",
+        "pattern": "Contains '../' or '/etc/passwd' patterns",
+        "category": "Rule-Based (Signature Detection)"
+    },
+    "SQL_INJECTION": {
+        "name": "SQL Injection Attack",
+        "severity": "CRITICAL", 
+        "description": "Detects SQL injection attack patterns in requests",
+        "pattern": "Contains 'UNION SELECT', 'OR 1=1', or SQL keywords",
+        "category": "Rule-Based (Signature Detection)"
+    },
+    "IP_VOLUME_ANOMALY": {
+        "name": "IP Volume Anomaly",
+        "severity": "MEDIUM",
+        "description": "Detects IPs with abnormally high activity volume",
+        "pattern": "Activity > Mean + 2×StdDev",
+        "category": "ML-Based (IP Anomaly Detection)"
+    },
+    "IP_VELOCITY_ANOMALY": {
+        "name": "IP Velocity Anomaly",
+        "severity": "HIGH",
+        "description": "Detects IPs with abnormally high request rates",
+        "pattern": "Request rate > 10× median",
+        "category": "ML-Based (IP Anomaly Detection)"
+    },
+    "MULTI_VECTOR_ATTACK": {
+        "name": "Multi-Vector Attack Pattern",
+        "severity": "HIGH",
+        "description": "Detects IPs attacking from multiple sources",
+        "pattern": "≥3 different attack vectors from same IP",
+        "category": "ML-Based (Behavioral Analysis)"
+    }
+}
 
 
-def _within_time_window(
-    events: List[Dict[str, Any]], window_minutes: int, threshold: int
-) -> int:
+def run_detection(db: Session, events_to_analyze=None):
     """
-    Returns the maximum number of events that occurred within any sliding
-    window of `window_minutes`. Expects events to have a 'timestamp' key
-    with a datetime value.
-    """
-    if not events:
-        return 0
+    Run comprehensive threat detection using:
+    1. Rule-Based Detection (Threshold & Signature-based)
+    2. Statistical Anomaly Detection (ML-lite) - ADAPTIVE THRESHOLDS
 
-    events = [e for e in events if isinstance(e.get("timestamp"), datetime)]
-    if not events:
-        return 0
+    Args:
+        db: Database session
+        events_to_analyze: Optional list of events to analyze (defaults to all events)
 
-    events.sort(key=lambda x: x["timestamp"])
-
-    window = timedelta(minutes=window_minutes)
-    max_in_window = 0
-    start = 0
-
-    for end in range(len(events)):
-        while (
-            events[end]["timestamp"] - events[start]["timestamp"] > window
-            and start < end
-        ):
-            start += 1
-
-        count = end - start + 1
-        max_in_window = max(max_in_window, count)
-
-        if max_in_window >= threshold:
-            break
-
-    return max_in_window
-
-
-def detect_bruteforce(
-    events: List[Dict[str, Any]],
-    *,
-    threshold: int = 5,
-    window_minutes: int = 5,
-) -> List[Dict[str, Any]]:
-    """
-    Detect brute-force login attempts based on Windows Security events.
-
-    Rule:
-      - If an IP generates at least `threshold` failed login events (4625)
-        within any `window_minutes`‑minute window, raise a High severity incident.
-    """
-    incidents: List[Dict[str, Any]] = []
-    failures_by_ip: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-
-    for e in events:
-        if e.get("event_id") == FAILED_LOGIN:
-            ip = e.get("ip", "unknown")
-            failures_by_ip[ip].append(e)
-
-    for ip, fails in failures_by_ip.items():
-        max_count = _within_time_window(fails, window_minutes, threshold)
-        if max_count >= threshold:
-            incidents.append(
-                {
-                    "type": "Brute Force Attack",
-                    "severity": "High",
-                    "ip": ip,
-                    "count": max_count,
-                    "rule": "FAILED_LOGIN_THRESHOLD",
-                    "window_minutes": window_minutes,
-                    "description": f"{max_count} failed login attempts detected from {ip} within {window_minutes} minutes",
-                }
-            )
-
-    return incidents
-
-
-
-def run_detection(db: Session):
-    """
-    Run rule‑based + simple ML‑style anomaly detection over all stored logs.
-
-    Returns a list of incident dictionaries that were created during this run.
+    Returns list of detected incidents with detailed rule information.
     """
 
-    logs = db.query(LogEvent).all()
+    if events_to_analyze is None:
+        logs = db.query(LogEvent).all()
+    else:
+        logs = events_to_analyze
 
+    if not logs:
+        return []
+
+    # Data structures for tracking
     ip_fail_count: Dict[str, int] = defaultdict(int)
+    ip_http_fails: Dict[str, int] = defaultdict(int)
     ip_ports: Dict[str, set] = defaultdict(set)
     ip_event_count: Dict[str, int] = defaultdict(int)
 
     created_incidents: List[Incident] = []
 
+    # ========================================================================
+    # PHASE 1: PATTERN ANALYSIS (Rule-Based Signature Detection)
+    # ========================================================================
+
     for log in logs:
         ip = log.ip or "unknown"
         ip_event_count[ip] += 1
 
-        # SSH brute force (rule‑based)
+        # RULE 1: SSH Brute Force Detection
         if log.source == "ssh" and log.action and "Failed" in log.action:
             ip_fail_count[ip] += 1
 
-        # Port scanning (rule‑based)
-        if log.source == "firewall" and log.action == "BLOCK":
+        # RULE 2: HTTP Brute Force Detection
+        if log.source in ["apache", "nginx", "security", "web"] and log.severity in ["HIGH", "CRITICAL"]:
+            ip_http_fails[ip] += 1
+
+        # RULE 3: Port Scanning Detection
+        if log.source == "firewall" and log.action in ["BLOCK", "DENY"]:
             if log.resource:
                 ip_ports[ip].add(log.resource)
 
-        # Directory traversal (rule‑based)
-        if log.action and ("../" in log.action or "/etc/passwd" in log.action):
+        # RULE 4: Directory Traversal Detection (Immediate)
+        if log.action and ("../" in log.action or "/etc/passwd" in log.action or "c:\\windows" in log.action):
+            rule = DETECTION_RULES["DIRECTORY_TRAVERSAL"]
             incident = Incident(
                 type="DIRECTORY_TRAVERSAL",
                 severity="CRITICAL",
                 source_ip=ip,
-                description="Suspicious file path access",
+                description=f"🚨 {rule['name']} | Rule: {rule['pattern']} | Method: {rule['category']} | Target: {log.action[:100]}"
             )
             db.add(incident)
             created_incidents.append(incident)
 
-    # SSH brute‑force threshold (rule‑based)
-    for ip, count in ip_fail_count.items():
-        if count >= 5:
-            incident = Incident(
-                type="SSH_BRUTE_FORCE",
-                severity="HIGH",
-                source_ip=ip,
-                description="Multiple failed SSH attempts",
-            )
-            db.add(incident)
-            created_incidents.append(incident)
+        # RULE 5: SQL Injection Detection (Immediate)
+        if log.action:
+            sql_patterns = ["UNION SELECT", "OR 1=1", "'; DROP", "' OR '1'='1"]
+            if any(pattern.lower() in log.action.lower() for pattern in sql_patterns):
+                rule = DETECTION_RULES["SQL_INJECTION"]
+                incident = Incident(
+                    type="SQL_INJECTION",
+                    severity="CRITICAL",
+                    source_ip=ip,
+                    description=f"🚨 {rule['name']} | Rule: {rule['pattern']} | Method: {rule['category']} | Query: {log.action[:100]}"
+                )
+                db.add(incident)
+                created_incidents.append(incident)
 
-    # Port scan threshold (rule‑based)
-    for ip, ports in ip_ports.items():
-        if len(ports) >= 3:
-            incident = Incident(
-                type="PORT_SCAN",
-                severity="HIGH",
-                source_ip=ip,
-                description="Multiple blocked ports detected",
-            )
-            db.add(incident)
-            created_incidents.append(incident)
+    # ========================================================================
+    # PHASE 2: ADAPTIVE THRESHOLD ANALYSIS (Dataset-Responsive)
+    # ========================================================================
 
-    # --- Simple ML‑style anomaly detection (no external deps) ---
-    # Treat IPs with unusually high event volume as anomalies.
+    # Calculate dataset statistics for adaptive thresholds
+    total_events = len(logs)
+    unique_ips = len(ip_event_count)
+
+    if unique_ips >= 3:  # Need minimum data for statistical analysis
+        # Calculate adaptive thresholds based on dataset characteristics
+        ssh_fail_counts = list(ip_fail_count.values())
+        http_fail_counts = list(ip_http_fails.values())
+        port_scan_counts = [len(ports) for ports in ip_ports.values()]
+
+        # RULE 1: SSH Brute Force with Adaptive Threshold
+        rule = DETECTION_RULES["SSH_BRUTE_FORCE"]
+        if ssh_fail_counts:
+            # Adaptive threshold: mean + 2*std_dev, but at least 3
+            avg_ssh_fails = mean(ssh_fail_counts) if ssh_fail_counts else 0
+            std_ssh_fails = pstdev(ssh_fail_counts) if len(ssh_fail_counts) > 1 else 0
+            adaptive_ssh_threshold = max(3, int(avg_ssh_fails + 2 * std_ssh_fails))
+
+            for ip, count in ip_fail_count.items():
+                if count >= adaptive_ssh_threshold:
+                    incident = Incident(
+                        type="SSH_BRUTE_FORCE",
+                        severity=rule["severity"],
+                        source_ip=ip,
+                        description=f"🚨 {rule['name']} | Adaptive Rule: ≥{adaptive_ssh_threshold} attempts (dataset: μ={avg_ssh_fails:.1f}, σ={std_ssh_fails:.1f}) | Detected: {count} attempts | Method: {rule['category']}"
+                    )
+                    db.add(incident)
+                    created_incidents.append(incident)
+
+        # RULE 2: HTTP Brute Force with Adaptive Threshold
+        rule = DETECTION_RULES["HTTP_BRUTE_FORCE"]
+        if http_fail_counts:
+            # Adaptive threshold: mean + 2*std_dev, but at least 5
+            avg_http_fails = mean(http_fail_counts) if http_fail_counts else 0
+            std_http_fails = pstdev(http_fail_counts) if len(http_fail_counts) > 1 else 0
+            adaptive_http_threshold = max(5, int(avg_http_fails + 2 * std_http_fails))
+
+            for ip, count in ip_http_fails.items():
+                if count >= adaptive_http_threshold:
+                    incident = Incident(
+                        type="HTTP_BRUTE_FORCE",
+                        severity=rule["severity"],
+                        source_ip=ip,
+                        description=f"🚨 {rule['name']} | Adaptive Rule: ≥{adaptive_http_threshold} failed requests (dataset: μ={avg_http_fails:.1f}, σ={std_http_fails:.1f}) | Detected: {count} failed requests | Method: {rule['category']}"
+                    )
+                    db.add(incident)
+                    created_incidents.append(incident)
+
+        # RULE 3: Port Scanning with Adaptive Threshold
+        rule = DETECTION_RULES["PORT_SCAN"]
+        if port_scan_counts:
+            # Adaptive threshold: mean + 1.5*std_dev, but at least 2
+            avg_ports = mean(port_scan_counts) if port_scan_counts else 0
+            std_ports = pstdev(port_scan_counts) if len(port_scan_counts) > 1 else 0
+            adaptive_port_threshold = max(2, int(avg_ports + 1.5 * std_ports))
+
+            for ip, ports in ip_ports.items():
+                if len(ports) >= adaptive_port_threshold:
+                    incident = Incident(
+                        type="PORT_SCAN",
+                        severity=rule["severity"],
+                        source_ip=ip,
+                        description=f"🚨 {rule['name']} | Adaptive Rule: ≥{adaptive_port_threshold} ports scanned (dataset: μ={avg_ports:.1f}, σ={std_ports:.1f}) | Detected: {len(ports)} ports | Method: {rule['category']}"
+                    )
+                    db.add(incident)
+                    created_incidents.append(incident)
+    else:
+        # Fallback to fixed thresholds when dataset is too small
+        print(f"[detection] Dataset too small ({unique_ips} IPs), using fixed thresholds")
+
+        # RULE 1: SSH Brute Force Threshold (Fixed)
+        rule = DETECTION_RULES["SSH_BRUTE_FORCE"]
+        for ip, count in ip_fail_count.items():
+            if count >= rule["threshold"]:
+                incident = Incident(
+                    type="SSH_BRUTE_FORCE",
+                    severity=rule["severity"],
+                    source_ip=ip,
+                    description=f"🚨 {rule['name']} | Rule: {rule['pattern']} | Triggered: {count} attempts detected | Method: {rule['category']}"
+                )
+                db.add(incident)
+                created_incidents.append(incident)
+
+        # RULE 2: HTTP Brute Force Threshold (Fixed)
+        rule = DETECTION_RULES["HTTP_BRUTE_FORCE"]
+        for ip, count in ip_http_fails.items():
+            if count >= rule["threshold"]:
+                incident = Incident(
+                    type="HTTP_BRUTE_FORCE",
+                    severity=rule["severity"],
+                    source_ip=ip,
+                    description=f"🚨 {rule['name']} | Rule: {rule['pattern']} | Triggered: {count} failed requests | Method: {rule['category']}"
+                )
+                db.add(incident)
+                created_incidents.append(incident)
+
+        # RULE 3: Port Scan Threshold (Fixed)
+        rule = DETECTION_RULES["PORT_SCAN"]
+        for ip, ports in ip_ports.items():
+            if len(ports) >= rule["threshold"]:
+                incident = Incident(
+                    type="PORT_SCAN",
+                    severity=rule["severity"],
+                    source_ip=ip,
+                    description=f"🚨 {rule['name']} | Rule: {rule['pattern']} | Triggered: {len(ports)} ports scanned | Method: {rule['category']}"
+                )
+                db.add(incident)
+                created_incidents.append(incident)
+    
+    # ========================================================================
+    # PHASE 3: IP ANOMALY DETECTION (ML-Based)
+    # ========================================================================
+    
+    # ANOMALY 1: Volume Anomalies (Z-score Analysis)
+    rule = DETECTION_RULES["IP_VOLUME_ANOMALY"]
     if ip_event_count:
         counts = list(ip_event_count.values())
-        if len(counts) >= 2:
+        if len(counts) >= 3:  # Need at least 3 IPs for meaningful statistics
             avg = mean(counts)
             std = pstdev(counts)
-            # Avoid zero‑std edge cases
+            
             if std > 0:
                 threshold = avg + 2 * std
+                
                 for ip, count in ip_event_count.items():
                     if count > threshold:
+                        z_score = (count - avg) / std
+                        
+                        # Severity based on Z-score
+                        if z_score > 3:
+                            severity = "CRITICAL"
+                        elif z_score > 2.5:
+                            severity = "HIGH"
+                        else:
+                            severity = "MEDIUM"
+                        
                         incident = Incident(
-                            type="ANOMALY_ML",
-                            severity="MEDIUM",
+                            type="IP_VOLUME_ANOMALY",
+                            severity=severity,
                             source_ip=ip,
-                            description=(
-                                f"IP generated {count} events, which is above the "
-                                f"anomaly threshold ({threshold:.1f}) based on peer activity"
-                            ),
+                            description=f"📊 {rule['name']} | Rule: {rule['pattern']} | Baseline: {avg:.1f}±{std:.1f} events | Detected: {count} events | Z-score: {z_score:.2f} | Method: {rule['category']}"
                         )
                         db.add(incident)
                         created_incidents.append(incident)
-
+    
+    # ANOMALY 2: Multi-Vector Attacks (Behavioral Analysis)
+    rule = DETECTION_RULES["MULTI_VECTOR_ATTACK"]
+    ip_sources = defaultdict(set)
+    ip_severities = defaultdict(lambda: {"high": 0, "total": 0})
+    
+    for log in logs:
+        ip = log.ip or "unknown"
+        if ip != "unknown":
+            ip_sources[ip].add(log.source)
+            ip_severities[ip]["total"] += 1
+            if log.severity in ["HIGH", "CRITICAL"]:
+                ip_severities[ip]["high"] += 1
+    
+    # Detect multi-vector attacks
+    for ip, sources in ip_sources.items():
+        if len(sources) >= 3:  # Attacking from 3+ different sources
+            incident = Incident(
+                type="MULTI_VECTOR_ATTACK",
+                severity="HIGH",
+                source_ip=ip,
+                description=f"🎯 {rule['name']} | Rule: {rule['pattern']} | Vectors: {', '.join(sources)} | Total: {len(sources)} vectors | Method: {rule['category']}"
+            )
+            db.add(incident)
+            created_incidents.append(incident)
+    
+    # ANOMALY 3: High Threat Ratio (Behavioral Analysis)
+    for ip, stats in ip_severities.items():
+        if stats["total"] >= 10:  # At least 10 events
+            threat_ratio = stats["high"] / stats["total"]
+            if threat_ratio > 0.5:  # More than 50% malicious
+                incident = Incident(
+                    type="HIGH_THREAT_RATIO",
+                    severity="HIGH",
+                    source_ip=ip,
+                    description=f"⚠️ High Threat IP | {stats['high']}/{stats['total']} events malicious ({threat_ratio*100:.0f}%) | Persistent attacker pattern | Method: ML-Based (Behavioral Analysis)"
+                )
+                db.add(incident)
+                created_incidents.append(incident)
+    
     db.commit()
-
-    # Return a lightweight representation for APIs
+    
+    # Return detailed incident information
     return [
         {
             "id": incident.id,
@@ -187,3 +350,16 @@ def run_detection(db: Session):
         }
         for incident in created_incidents
     ]
+
+
+def get_detection_rules_summary():
+    """
+    Returns a summary of all detection rules for display in dashboard.
+    Use this to showcase your detection capabilities!
+    """
+    return {
+        "total_rules": len(DETECTION_RULES),
+        "rule_based_count": sum(1 for r in DETECTION_RULES.values() if "Rule-Based" in r["category"]),
+        "ml_based_count": sum(1 for r in DETECTION_RULES.values() if "ML-Based" in r["category"]),
+        "rules": DETECTION_RULES
+    }

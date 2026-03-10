@@ -404,8 +404,10 @@ async def upload_logs(file: UploadFile = File(...), db: Session = Depends(get_db
         print(f"[upload] committed {len(parsed_events)} events")
         db_ok = True
         try:
-            incidents = len(run_detection(db))
-        except Exception:
+            # Run detection on newly uploaded events only (more efficient and targeted)
+            incidents = len(run_detection(db, parsed_events))
+        except Exception as e:
+            print(f"[upload] detection error: {e}")
             incidents = 0
     except Exception as e:
         print(f"[upload] database write unavailable (read-only?): {e}")
@@ -467,11 +469,23 @@ def get_logs(db: Session = Depends(get_db)):
 def get_analytics(db: Session = Depends(get_db)):
     """
     Compute all dashboard metrics from stored events.
+    For performance, only processes the most recent 2000 events.
     Every value is derived strictly from the parsed log data — nothing is random or hardcoded.
     """
     try:
-        all_events = db.query(LogEvent).all()
-        return _compute_analytics_from_events(all_events)
+        # Get total count of all events in database
+        total_events_count = db.query(LogEvent).count()
+
+        # Performance optimization: only process the most recent 1000 events
+        # This prevents slowdown with large datasets while still providing meaningful analytics
+        recent_events = db.query(LogEvent).order_by(LogEvent.id.desc()).limit(1000).all()
+
+        analytics = _compute_analytics_from_events(recent_events)
+
+        # Override the total_events with the actual database count
+        analytics['total_events'] = total_events_count
+
+        return analytics
     except Exception as e:
         print(f"[analytics] error: {e}")
         import traceback

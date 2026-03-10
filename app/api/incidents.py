@@ -12,7 +12,7 @@ def get_incidents(db: Session = Depends(get_db)):
     """
     Return the most recent incidents (rule‑based + ML) from PostgreSQL.
     """
-    incidents = db.query(Incident).order_by(Incident.id.desc()).limit(100).all()
+    incidents = db.query(Incident).order_by(Incident.id.desc()).limit(1000).all()
 
     return [
         {
