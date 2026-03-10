@@ -336,11 +336,15 @@ def _compute_analytics_from_events(all_events) -> Dict[str, Any]:
         bw_values.append(round(sum((getattr(ev, 'bytes_sent', None) or 0) for ev in bucket) / 1_000_000, 4))
     bandwidth_usage = {'labels': bw_labels, 'values': bw_values}
 
-    # Most recent 100: ORM has id; Pydantic events use reverse list order
-    try:
-        recent = sorted(all_events, key=lambda e: e.id, reverse=True)[:100]
-    except (TypeError, AttributeError):
-        recent = list(reversed(all_events))[:100]
+    def _severity_score(ev) -> int:
+        s = (getattr(ev, 'severity', None) or 'LOW').upper()
+        return {'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1}.get(s, 0)
+
+    def _sort_key(e):
+        return (_severity_score(e), str(getattr(e, 'timestamp', '') or ''))
+
+    # Show all data ordered by severity (high to low), then ID/timestamp DESC
+    recent = sorted(all_events, key=_sort_key, reverse=True)
     forensics_table = [
         {
             'timestamp': getattr(ev, 'timestamp', None) or '—',
@@ -431,7 +435,7 @@ def get_logs(db: Session = Depends(get_db)):
     """Return the most recent 100 log events for the dashboard."""
     try:
         total_count = db.query(LogEvent).count()
-        logs = db.query(LogEvent).order_by(LogEvent.id.desc()).limit(100).all()
+        logs = db.query(LogEvent).order_by(LogEvent.id.desc()).all()
         return {
             "total_events": total_count,
             "logs": [
