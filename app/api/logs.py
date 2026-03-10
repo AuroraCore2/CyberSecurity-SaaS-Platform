@@ -345,7 +345,8 @@ def _compute_analytics_from_events(all_events) -> Dict[str, Any]:
         if sort_id is not None:
             secondary = f"{sort_id:010d}"
         else:
-            secondary = str(getattr(e, 'timestamp', '') or '')
+            t = getattr(e, 'timestamp', None)
+            secondary = str(t) if t is not None else ""
         return (_severity_score(e), secondary)
 
     # Show all data ordered by severity (high to low), then ID/timestamp DESC
