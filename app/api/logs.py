@@ -1,6 +1,6 @@
 import re
 from collections import Counter
-from typing import Dict, Any
+from typing import Dict, Any, List, cast
 
 from fastapi import APIRouter, UploadFile, File, Depends
 from sqlalchemy.orm import Session
