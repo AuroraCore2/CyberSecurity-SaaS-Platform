@@ -225,7 +225,7 @@ def _compute_analytics_from_events(all_events) -> Dict[str, Any]:
 
     unique_attacker_ips = set(
         getattr(ev, 'ip', None) for ev in all_events
-        if getattr(ev, 'ip', None) and not _is_internal(str(getattr(ev, 'ip', '')))
+        if getattr(ev, 'ip', None)
     )
     unique_attackers = len(unique_attacker_ips)
     system_health = max(0.0, round(100.0 - (critical_threats / total * 100.0), 1))
@@ -345,6 +345,108 @@ def _compute_analytics_from_events(all_events) -> Dict[str, Any]:
 
     # Show all data ordered by severity (high to low), then ID/timestamp DESC
     recent = sorted(all_events, key=_sort_key, reverse=True)
+
+    detected_incidents = []
+    # Group incidents by type and description to avoid spamming the UI and combine source IPs
+    # Using a typed dict structure for internal grouping
+    incident_groups: dict[str, dict[str, Any]] = {}
+    
+    # Identify all CRITICAL, HIGH, and MEDIUM events as potential incidents
+    incident_candidates = [ev for ev in recent if (getattr(ev, 'severity', None) or 'LOW').upper() in ('CRITICAL', 'HIGH', 'MEDIUM')]
+    
+    for ev in incident_candidates:
+        severity = (getattr(ev, 'severity', None) or 'HIGH').upper()
+        action_text = getattr(ev, 'action', None) or ''
+        resource_text = getattr(ev, 'resource', None) or ''
+        full_text = f"{action_text} {resource_text}".lower()
+        source_ip = getattr(ev, 'ip', None) or 'Unknown'
+        timestamp = getattr(ev, 'timestamp', None) or '—'
+        evt_type = str(getattr(ev, 'event_type', None) or '').lower()
+        status_code = getattr(ev, 'status_code', None)
+        
+        # Determine rich type and description
+        inc_type = 'Suspicious Activity'
+        desc = f"Action: {action_text}"
+        if resource_text and resource_text not in action_text:
+            desc += f" on {resource_text}"
+
+        is_web = getattr(ev, 'source', '') == 'web' or 'http_request' in evt_type
+        outcome = "SUSPECTED_BREACH" if str(status_code) == "200" else "BLOCKED_PROBE"
+
+        # Heuristics for common attacks
+        if is_web or 'sqli' in evt_type or 'sql' in full_text or 'union' in full_text or 'select' in full_text:
+            if any(k in full_text for k in ['select', 'union', 'insert', 'drop', '--', '%27', "'"]):
+                inc_type = 'SQL Injection'
+                desc = "Attempted database manipulation. " + ("Target potentially vulnerable - request successful." if outcome == "SUSPECTED_BREACH" else "Request blocked by security filters.")
+        
+        elif '../' in full_text or '/etc/passwd' in full_text or 'traversal' in evt_type:
+            inc_type = 'Directory Traversal'
+            desc = "Path traversal detected. " + ("Sensitive file exposure suspected." if outcome == "SUSPECTED_BREACH" else "Access denied by filesystem permissions or WAF.")
+            
+        elif '<script>' in full_text or 'alert(' in full_text or 'xss' in evt_type:
+            inc_type = 'Cross Site Scripting'
+            desc = "Script injection payload detected. " + ("Payload delivered to victim session." if outcome == "SUSPECTED_BREACH" else "Malicious script filtered out.")
+            
+        elif '/exec' in full_text or 'cmd=' in full_text or 'rce' in evt_type:
+            inc_type = 'Remote Code Execution'
+            desc = "Command execution attempt. " + ("High probability of system compromise." if outcome == "SUSPECTED_BREACH" else "Execution attempt terminated.")
+
+        elif getattr(ev, 'source', '') == 'ssh':
+            if 'fail' in full_text or 'brute' in evt_type:
+                inc_type = 'SSH Brute Force'
+                desc = "Repeated failed SSH authentication. " + ("Brute force attack in progress." if outcome == "BLOCKED_PROBE" else "Account takeover detected.")
+
+        elif status_code in ('401', '403') and ('login' in full_text or 'auth' in full_text):
+            inc_type = 'Authentication Attack'
+            desc = "Unauthorized access attempt to authentication endpoint."
+            
+        elif getattr(ev, 'source', '') == 'firewall' and 'block' in full_text:
+            inc_type = 'Firewall Block / Port Scan'
+            desc = f"Network probing activity blocked on resource {resource_text}."
+            
+        # Refine severity and aggregate descriptive outcome
+        if outcome == "SUSPECTED_BREACH" and severity != "CRITICAL":
+            severity = "CRITICAL"
+        
+        full_desc = f"OUTCOME: {outcome} | {desc}"
+            
+        # Fallback formatting if no heuristic matched
+        if inc_type == 'Suspicious Activity' and evt_type and evt_type not in ('http_request', 'network', 'authentication'):
+            inc_type = evt_type.replace('_', ' ').title()
+
+        # Grouping key
+        group_key = f"{inc_type}_{severity}_{full_desc}"
+        
+        if group_key not in incident_groups:
+            incident_groups[group_key] = {
+                'timestamp': timestamp, # Keep the most recent timestamp (since sorted DESC)
+                'type': inc_type,
+                'severity': severity,
+                'source_ips': [source_ip],
+                'description': full_desc
+            }
+        else:
+            if source_ip not in incident_groups[group_key]['source_ips']:
+                incident_groups[group_key]['source_ips'].append(source_ip)
+
+    # Flatten and format
+    for grp in incident_groups.values():
+        ips = cast(List[str], grp['source_ips'])
+        ip_display = ", ".join(ips[:3])
+        if len(ips) > 3:
+            ip_display += f", +{len(ips) - 3} more"
+            
+        detected_incidents.append({
+            'timestamp': grp['timestamp'],
+            'type': grp['type'],
+            'severity': grp['severity'],
+            'source_ip': ip_display,
+            'description': grp['description']
+        })
+
+    # Sort detected incidents by severity (CRITICAL > HIGH > MEDIUM)
+    severity_map = {'CRITICAL': 3, 'HIGH': 2, 'MEDIUM': 1, 'LOW': 0}
+    detected_incidents.sort(key=lambda x: severity_map.get(x['severity'], 0), reverse=True)
     forensics_table = [
         {
             'timestamp': getattr(ev, 'timestamp', None) or '—',
@@ -367,6 +469,7 @@ def _compute_analytics_from_events(all_events) -> Dict[str, Any]:
         'top_endpoints': top_endpoints, 'user_agent_analysis': user_agent_analysis,
         'response_codes': response_codes, 'bandwidth_usage': bandwidth_usage,
         'forensics_table': forensics_table,
+        'detected_incidents': detected_incidents,
     }
 
 
@@ -511,4 +614,5 @@ def _empty_analytics() -> Dict[str, Any]:
         'response_codes':        {'labels': [], 'values': []},
         'bandwidth_usage':       {'labels': [], 'values': []},
         'forensics_table': [],
+        'detected_incidents': [],
     }

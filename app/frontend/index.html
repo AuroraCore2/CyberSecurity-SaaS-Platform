@@ -287,20 +287,6 @@
             .chat-sidebar { display: none; }
             .metrics-row { grid-template-columns: repeat(3,1fr); }
         }
-        .rule-item {
-            padding: 8px 10px;
-            background: rgba(255,255,255,0.015);
-            border: 1px solid rgba(255,255,255,0.04);
-            border-radius: 4px;
-            transition: all 0.2s;
-        }
-
-        .rule-item:hover {
-            background: rgba(255,0,60,0.04);
-            border-color: rgba(255,0,60,0.2);
-            transform: translateX(3px);
-        }
-
         @media (max-width: 768px) {
             nav { padding: 1rem 3%; flex-direction: column; gap: 12px; position: relative; }
             .page { padding-top: 20px; }
@@ -310,6 +296,11 @@
             div[style*="grid-template-columns: repeat(3, 1fr)"] { grid-template-columns: 1fr !important; }
             .container { padding: 1rem; }
         }
+        /* Custom Scrollbar for Incidents */
+        #incidents-list::-webkit-scrollbar { width: 5px; height: 5px; }
+        #incidents-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+        #incidents-list::-webkit-scrollbar-thumb { background: rgba(255,0,60,0.45); border-radius: 3px; }
+        #incidents-list::-webkit-scrollbar-thumb:hover { background: rgba(255,0,60,0.75); }
     </style>
 </head>
 <body>
@@ -650,196 +641,24 @@
                 </div>
             </div>
 
-            <!-- ============ DETECTION RULES SHOWCASE ============ -->
-            <div class="stat-card" style="margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
-                    <h3 style="color: var(--neon-red); font-size: 0.9rem; display: flex; align-items: center; gap: 10px;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff003c" stroke-width="2">
-                            <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
-                            <path d="M2 17L12 22L22 17"/>
-                            <path d="M2 12L12 17L22 12"/>
-                        </svg>
-                        DETECT INCIDENT
-                    </h3>
-                    <span style="font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--cyber-blue); letter-spacing: 1px;">
-                        8 RULES DEPLOYED
-                    </span>
-                </div>
-
-                <!-- Detection Rules List -->
-                <div style="display: grid; gap: 8px; max-height: 280px; overflow-y: auto; padding-right: 4px;">
-                    <style>
-                        div[style*="max-height: 280px"]::-webkit-scrollbar {
-                            width: 6px;
-                        }
-                        div[style*="max-height: 280px"]::-webkit-scrollbar-track {
-                            background: rgba(0,242,255,0.05);
-                            border-radius: 3px;
-                        }
-                        div[style*="max-height: 280px"]::-webkit-scrollbar-thumb {
-                            background: linear-gradient(180deg, #00f2ff, #0088ff);
-                            border-radius: 3px;
-                            transition: background 0.3s ease;
-                        }
-                        div[style*="max-height: 280px"]::-webkit-scrollbar-thumb:hover {
-                            background: linear-gradient(180deg, #33fbff, #00b4ff);
-                        }
-                    </style>
-
-                        <!-- CRITICAL SEVERITY RULES -->
-                        <!-- Rule 1: Directory Traversal -->
-                        <div class="rule-item">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.72rem; color: var(--text-high); font-weight: 600;">DIRECTORY_TRAVERSAL</span>
-                                <span class="sev-badge sev-critical" style="font-size: 0.6rem; padding: 1px 6px;">CRITICAL</span>
-                            </div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 0.63rem; color: rgba(200,220,255,0.4); line-height: 1.5; margin-bottom: 5px;">
-                                Path traversal attempts to access system files outside web root. Attacker escaping application restrictions to read config, credentials, or system binaries (/etc/passwd).
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,200,255,0.7);">Source: <span style="color: var(--cyber-blue);">89.163.128.45</span></span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(255,0,100,0.8);">Web server logs | File access</span>
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--neon-red); font-weight: 600; padding: 2px 8px; background: rgba(255,0,60,0.15); border-radius: 3px;">IMMEDIATE</span>
-                            </div>
-                        </div>
-
-                        <!-- Rule 2: SQL Injection -->
-                        <div class="rule-item">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.72rem; color: var(--text-high); font-weight: 600;">SQL_INJECTION</span>
-                                <span class="sev-badge sev-critical" style="font-size: 0.6rem; padding: 1px 6px;">CRITICAL</span>
-                            </div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 0.63rem; color: rgba(200,220,255,0.4); line-height: 1.5; margin-bottom: 5px;">
-                                SQL syntax in HTTP requests targeting database backend. Attacker can bypass authentication, steal entire databases, or execute arbitrary system commands via database server.
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,200,255,0.7);">Source: <span style="color: var(--cyber-blue);">45.33.112.78, 195.154.22.90</span></span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(255,0,100,0.8);">Web app logs | Database queries</span>
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--neon-red); font-weight: 600; padding: 2px 8px; background: rgba(255,0,60,0.15); border-radius: 3px;">DATA BREACH</span>
-                            </div>
-                        </div>
-
-                        <!-- HIGH SEVERITY RULES -->
-                        <!-- Rule 3: SSH Brute Force -->
-                        <div class="rule-item">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.72rem; color: var(--text-high); font-weight: 600;">SSH_BRUTE_FORCE</span>
-                                <span class="sev-badge sev-high" style="font-size: 0.6rem; padding: 1px 6px;">HIGH</span>
-                            </div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 0.63rem; color: rgba(200,220,255,0.4); line-height: 1.5; margin-bottom: 5px;">
-                                Multiple failed authentication attempts on SSH service. Indicates credential stuffing or brute force password attack attempting to gain unauthorized shell access.
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,200,255,0.7);">Source: <span style="color: var(--cyber-blue);">192.168.1.105, 10.0.22.88</span></span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(255,153,0,0.8);">Port 22 | Multiple sources</span>
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--neon-red); font-weight: 600; padding: 2px 8px; background: rgba(255,0,60,0.15); border-radius: 3px;">5+ attempts</span>
-                            </div>
-                        </div>
-
-                        <!-- Rule 4: HTTP Brute Force -->
-                        <div class="rule-item">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.72rem; color: var(--text-high); font-weight: 600;">HTTP_BRUTE_FORCE</span>
-                                <span class="sev-badge sev-high" style="font-size: 0.6rem; padding: 1px 6px;">HIGH</span>
-                            </div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 0.63rem; color: rgba(200,220,255,0.4); line-height: 1.5; margin-bottom: 5px;">
-                                Rapid failed HTTP 401/403 responses from single source. Attacker attempting to compromise web application login, admin panels, or API endpoints.
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,200,255,0.7);">Source: <span style="color: var(--cyber-blue);">203.45.67.123</span></span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(255,153,0,0.8);">Port 80/443 | Web servers</span>
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--neon-red); font-weight: 600; padding: 2px 8px; background: rgba(255,0,60,0.15); border-radius: 3px;">10+ requests</span>
-                            </div>
-                        </div>
-
-                        <!-- Rule 5: Port Scan -->
-                        <div class="rule-item">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.72rem; color: var(--text-high); font-weight: 600;">PORT_SCAN</span>
-                                <span class="sev-badge sev-high" style="font-size: 0.6rem; padding: 1px 6px;">HIGH</span>
-                            </div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 0.63rem; color: rgba(200,220,255,0.4); line-height: 1.5; margin-bottom: 5px;">
-                                Reconnaissance activity detecting open network services. Attacker mapping network topology before launching targeted exploits on vulnerable services.
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,200,255,0.7);">Source: <span style="color: var(--cyber-blue);">172.16.54.200</span></span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(255,153,0,0.8);">Firewall logs | All ports</span>
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--neon-red); font-weight: 600; padding: 2px 8px; background: rgba(255,0,60,0.15); border-radius: 3px;">3+ ports</span>
-                            </div>
-                        </div>
-
-                        <!-- Rule 6: Multi-Vector Attack -->
-                        <div class="rule-item" style="border-left: 2px solid var(--cyber-blue);">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.72rem; color: var(--cyber-blue); font-weight: 600;">MULTI_VECTOR_ATTACK</span>
-                                <span class="sev-badge sev-high" style="font-size: 0.6rem; padding: 1px 6px;">HIGH</span>
-                            </div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 0.63rem; color: rgba(0,242,255,0.5); line-height: 1.5; margin-bottom: 5px;">
-                                Multiple attack techniques from same source within short timeframe. Indicates sophisticated attacker testing various exploits (brute force + SQLi + traversal simultaneously).
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,200,255,0.7);">Source: <span style="color: var(--cyber-blue);">93.184.216.34</span></span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,242,255,0.6);">Correlated threats | Behavioral</span>
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--cyber-blue); font-weight: 600; padding: 2px 8px; background: rgba(0,242,255,0.12); border-radius: 3px;">3+ vectors</span>
-                            </div>
-                        </div>
-
-                        <!-- Rule 7: High Threat Ratio -->
-                        <div class="rule-item" style="border-left: 2px solid var(--cyber-blue);">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.72rem; color: var(--cyber-blue); font-weight: 600;">HIGH_THREAT_RATIO</span>
-                                <span class="sev-badge sev-high" style="font-size: 0.6rem; padding: 1px 6px;">HIGH</span>
-                            </div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 0.63rem; color: rgba(0,242,255,0.5); line-height: 1.5; margin-bottom: 5px;">
-                                Majority of activity from IP flagged as malicious. Indicates known threat actor, botnet member, or previously compromised system resuming attacks within monitored network.
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,200,255,0.7);">Source: <span style="color: var(--cyber-blue);">141.98.252.177</span></span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,242,255,0.6);">Threat intelligence | Statistical</span>
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--cyber-blue); font-weight: 600; padding: 2px 8px; background: rgba(0,242,255,0.12); border-radius: 3px;">50%+ malicious</span>
-                            </div>
-                        </div>
-
-                        <!-- MEDIUM SEVERITY RULES -->
-                        <!-- Rule 8: IP Volume Anomaly -->
-                        <div class="rule-item" style="border-left: 2px solid var(--cyber-blue);">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.72rem; color: var(--cyber-blue); font-weight: 600;">IP_VOLUME_ANOMALY</span>
-                                <span class="sev-badge sev-medium" style="font-size: 0.6rem; padding: 1px 6px;">MEDIUM</span>
-                            </div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 0.63rem; color: rgba(0,242,255,0.5); line-height: 1.5; margin-bottom: 5px;">
-                                Single IP generating abnormally high event volume (statistical outlier). Potential DDoS, scanning activity, or compromised internal system behaving erratically.
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,200,255,0.7);">Source: <span style="color: var(--cyber-blue);">10.45.200.15</span></span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.6rem; color: rgba(0,242,255,0.6);">All event sources | Z-score analysis</span>
-                                <span style="font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--cyber-blue); font-weight: 600; padding: 2px 8px; background: rgba(0,242,255,0.12); border-radius: 3px;">2σ deviation</span>
-                            </div>
-                        </div>
+            <!-- Detected Incidents -->
+            <div class="stat-card" style="margin-bottom:28px;" id="incidents-container">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <h3 style="color:var(--neon-red); font-size:0.9rem; font-family:'Space Grotesk'; letter-spacing:1px; margin:0;">DETECTED INCIDENTS</h3>
                     </div>
+                    <span id="incidents-count-label" style="color:var(--cyber-blue); font-family:'JetBrains Mono'; font-size:0.75rem; font-weight:700; letter-spacing:1px;"></span>
                 </div>
+                <!-- Incident collection area -->
+                <div class="incidents-list" id="incidents-list" style="display:flex; flex-direction:column; max-height:300px; overflow-y:auto; background:rgba(0,0,0,0.2); border-radius:4px;">
+                </div>
+            </div>
 
             <!-- Events Table -->
             <div class="stat-card" style="margin-bottom:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
                     <h3 style="color:var(--neon-red); font-size:0.9rem;">DETAILED EVENT FORENSICS</h3>
-                    <span id="table-count" style="font-family:'JetBrains Mono'; font-size:0.65rem; color:var(--text-low);"></span>
+                    <span id="table-count" style="font-family:'JetBrains Mono'; font-size:0.75rem; color:var(--cyber-blue); font-weight:700; letter-spacing:1px;"></span>
                 </div>
                 <div class="table-outer">
                     <table>
@@ -1112,6 +931,64 @@ function renderFromAPI(data) {
     else if (health > 70)  { hEl.textContent = health.toFixed(1) + '% [ WARNING ]'; hEl.style.color = '#ffcc00'; }
     else                   { hEl.textContent = health.toFixed(1) + '% [ RISK ]';    hEl.style.color = 'var(--neon-red)'; }
 
+    // Incidents list
+    const incidentEl = document.getElementById('incidents-list');
+    const incidentCountEl = document.getElementById('incidents-count-label');
+    const incidents = data.detected_incidents || [];
+    incidentCountEl.textContent = incidents.length + " INCIDENTS DETECTED";
+
+    if (incidents.length === 0) {
+        incidentEl.innerHTML = '<div style="color:var(--text-low); padding:15px; border:1px solid rgba(255,255,255,0.05); border-radius:6px; font-family:\'JetBrains Mono\'; text-align:center;">No critical incidents detected in this dataset.</div>';
+    } else {
+        let incHtml = '';
+        for (let i = 0; i < incidents.length; i++) {
+            const inc = incidents[i];
+            
+            const cls = inc.severity === 'CRITICAL' ? 'sev-critical' : inc.severity === 'HIGH' ? 'sev-high' : inc.severity === 'MEDIUM' ? 'sev-medium' : 'sev-low';
+            
+            const borderBottom = i === incidents.length - 1 ? '' : 'border-bottom: 1px solid rgba(255,0,60,0.15);';
+            const formatType = (inc.type || 'UNKNOWN').toUpperCase().replace(/\s+/g, '_');
+
+            // Determine secondary badge
+            let secBadge = 'INVESTIGATION_REQUIRED';
+            if (formatType.includes('SQL')) secBadge = 'DATA_BREACH';
+            else if (formatType.includes('BRUTE')) secBadge = 'AUTH_BYPASS';
+            else if (formatType.includes('RCE')) secBadge = 'SYSTEM_COMPROMISE';
+            else if (inc.severity === 'CRITICAL') secBadge = 'IMMEDIATE_ACTION';
+
+            incHtml += `
+            <div style="padding: 8px 20px; ${borderBottom} display: flex; justify-content: space-between; align-items: stretch; background: var(--glass-core); transition: all 0.2s ease; border-left: 2px solid transparent;" 
+                 onmouseover="this.style.background='rgba(255,0,60,0.05)'; this.style.borderLeftColor='var(--neon-red)';" 
+                 onmouseout="this.style.background='var(--glass-core)'; this.style.borderLeftColor='transparent';">
+                <div style="flex:1; padding-right:20px;">
+                    <div style="font-family:'JetBrains Mono'; font-size:0.9rem; font-weight:700; color:#fff; margin-bottom:4px; letter-spacing:1px;">
+                        ${escHtml(formatType)}
+                    </div>
+                    <div style="font-family:'JetBrains Mono'; font-size:0.68rem; font-weight:300; color:rgba(200,220,255,0.5); margin-bottom:6px; line-height:1.3; max-width:95%;">
+                        ${escHtml(inc.description)}
+                    </div>
+                    <div style="font-family:'JetBrains Mono'; font-size:0.75rem; color:var(--cyber-blue); margin-bottom:4px;">
+                        <span style="opacity:0.6;">SOURCE_ID: </span>
+                        <span style="font-weight:700;">${escHtml(inc.source_ip)}</span>
+                    </div>
+                    <div style="font-family:'JetBrains Mono'; font-size:0.6rem; color: rgba(255,0,60,0.4); font-weight:600; letter-spacing:1px;">
+                        SUBSYSTEM_LOG // NETWORK_TRACE_EXTRACT_LIVE
+                    </div>
+                </div>
+                
+                <div style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; padding-left:20px;">
+                    <div class="sev-badge ${cls}" style="font-size:0.6rem; padding:3px 10px; border-radius:3px;">
+                        ${escHtml(inc.severity)}
+                    </div>
+                    <div style="background:rgba(0,242,255,0.08); color:var(--cyber-blue); border:1px solid rgba(0,242,255,0.25); border-radius:4px; padding:3px 10px; font-family:'JetBrains Mono'; font-size:0.58rem; font-weight:700; letter-spacing:1.5px; margin-top:8px;">
+                        ${secBadge}
+                    </div>
+                </div>
+            </div>`;
+        }
+        incidentEl.innerHTML = incHtml;
+    }
+
     // Forensics table
     const rows = data.forensics_table || [];
     let htmlChunk = '';
@@ -1316,6 +1193,25 @@ function loadDemo() {
         user_agent_analysis: { labels: ['Chrome','Firefox','Bot/Scanner','Other'], values: [10,5,9,6] },
         response_codes:      { labels: topSt.map(s=>s[0]), values: topSt.map(s=>s[1]) },
         bandwidth_usage:     { labels: ['1s','2s','3s','4s','5s','6s','7s','8s'], values: [0.04,0.06,0.05,0.08,0.07,0.09,0.06,0.05] },
+        detected_incidents: [
+            { timestamp: "2024-02-10 10:01:08", type: "Admin Portal Recon", severity: "CRITICAL", source_ip: "45.33.22.11", description: "Unauthorized probing of /wp-admin entry point. Consistent with automated reconnaissance for administrative vulnerabilities." },
+            { timestamp: "2024-02-10 10:01:09", type: "Admin Portal Recon", severity: "CRITICAL", source_ip: "45.33.22.11", description: "Direct POST request to /xmlrpc.php for brute force or SSRF testing. Targeting administrative interface services." },
+            { timestamp: "2024-02-10 10:02:20", type: "Directory Traversal", severity: "CRITICAL", source_ip: "198.51.100.55", description: "Path traversal attempt targeting /etc/passwd discovered. Attacker attempting to escape application sandbox to read sensitive system configuration." },
+            { timestamp: "2024-02-10 10:04:12", type: "Config Disclosure", severity: "CRITICAL", source_ip: "45.33.22.11", description: "Unauthorized access attempt to config.php. Targeted probe to discover application logic and local file paths." },
+            { timestamp: "2024-02-10 10:04:55", type: "Configuration Leak", severity: "CRITICAL", source_ip: "91.108.4.177", description: "Unauthorized attempt to access /.env environment variables. Attacker targeting application credentials, API keys, and database connection strings." },
+            { timestamp: "2024-02-10 10:05:10", type: "Unauth API Access", severity: "HIGH", source_ip: "192.168.1.15", description: "Unauthorized PUT request to user profile API. Indicates privilege escalation attempt or broken object-level authorization." },
+            { timestamp: "2024-02-10 10:07:12", type: "Web Shell Detected", severity: "CRITICAL", source_ip: "203.0.113.42", description: "Anomalous access to administrative shell endpoint (/admin/shell). Indicators suggest post-exploitation activity or active web shell connection." },
+            { timestamp: "2024-02-10 10:08:20", type: "Cross Site Scripting", severity: "HIGH", source_ip: "198.51.100.55", description: "Reflected XSS payload detected in search parameters. Malicious script injection attempt targeting visitor browser sessions." },
+            { timestamp: "2024-02-10 10:09:01", type: "Remote Code Execution", severity: "CRITICAL", source_ip: "45.33.22.11", description: "OS command injection pattern detected in /api/exec endpoint. High risk of complete system compromise via unauthorized shell access." },
+            { timestamp: "2024-02-10 10:10:05", type: "Malicious File Upload", severity: "HIGH", source_ip: "91.108.4.177", description: "Potentially malicious file signature detected in POST request to upload.php. Possible attempt to upload web shells or persistent malware." },
+            { timestamp: "2024-02-10 10:11:05", type: "Sensitive File Access", severity: "CRITICAL", source_ip: "203.0.113.99", description: "Critical system file /etc/shadow targeted. This indicates an attempt to extract password hashes for offline cracking." },
+            { timestamp: "2024-02-10 10:11:22", type: "Bulk Data Erasure", severity: "HIGH", source_ip: "192.168.1.20", description: "High-impact DELETE request targeting bulk record pools. Destructive action initiated from an unauthenticated or low-privilege source." },
+            { timestamp: "2024-02-10 10:12:35", type: "DB Backup Exposure", severity: "CRITICAL", source_ip: "45.33.22.11", description: "Direct request for backup.sql database dump. High probability of data exfiltration attempt targeting the entire production dataset." },
+            { timestamp: "2024-02-10 10:14:00", type: "Auth Brute Force", severity: "CRITICAL", source_ip: "185.220.101.5", description: "Sustained login attempts followed by a 200 OK status code. Indicators suggest a successful brute force or account takeover event." }
+        ].sort((a,b) => {
+            const weights = {CRITICAL:3, HIGH:2, MEDIUM:1, LOW:0};
+            return (weights[b.severity]||0) - (weights[a.severity]||0);
+        }),
         forensics_table:     [...demoRows].sort((a,b) => {
             let sv = ({CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1}[b.severity]||0) - ({CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1}[a.severity]||0);
             return sv !== 0 ? sv : (b.timestamp || '').localeCompare(a.timestamp || '');
