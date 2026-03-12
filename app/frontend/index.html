@@ -476,7 +476,7 @@
 
         .oracle-popup {
             width: 100%;
-            max-width: 800px;
+            max-width: 950px;
             background: var(--glass-core);
             border: 1px solid var(--neon-red);
             border-radius: 12px;
@@ -515,8 +515,8 @@
         }
 
         #oracle-insight-content {
-            padding: 30px;
-            max-height: 70vh;
+            padding: 18px 25px;
+            max-height: 60vh;
             overflow-y: auto;
             font-family: 'JetBrains Mono';
             color: var(--text-high);
@@ -534,8 +534,8 @@
         .oracle-analysis-block {
             background: #000;
             border: 1px solid rgba(0, 242, 255, 0.15);
-            padding: 20px;
-            margin: 15px 0;
+            padding: 12px 20px;
+            margin: 8px 0;
             font-size: 0.8rem;
             line-height: 1.6;
             white-space: pre-wrap;
@@ -2320,13 +2320,13 @@ RESPONSE FORMAT RULES (follow strictly):
                         }
                     </div>
 
-                    <div style="margin-top:35px; display:flex; justify-content:flex-end; gap:15px;">
+                    <div style="margin-top: 15px; display:flex; justify-content:flex-end; gap:15px;">
                         <button class="btn" onclick="closeOracleOverlay()" 
-                                style="border-color:var(--neon-red); color:var(--neon-red); background:rgba(255,0,60,0.05); padding:10px 24px; font-size:0.75rem; letter-spacing:1.5px;">
+                                style="border-color:var(--neon-red); color:var(--neon-red); background:rgba(255,0,60,0.05); padding:8px 20px; font-size:0.75rem; letter-spacing:1.5px;">
                             ACKNOWLEDGE & CLOSE
                         </button>
                         <button class="btn" 
-                                style="border-color:var(--cyber-blue); color:var(--cyber-blue); background:rgba(0,242,255,0.05); padding:10px 24px; font-size:0.75rem; letter-spacing:1.5px;" 
+                                style="border-color:var(--cyber-blue); color:var(--cyber-blue); background:rgba(0,242,255,0.05); padding:8px 20px; font-size:0.75rem; letter-spacing:1.5px;" 
                                 onclick="continueInChat('${escJs(type)}', '${escJs(severity)}', '${escJs(ip)}', \`${escJs(description)}\`, \`${escJs(reply)}\`)">
                             CONTINUE IN CHAT →
                         </button>
