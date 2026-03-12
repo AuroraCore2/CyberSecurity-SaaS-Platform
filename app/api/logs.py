@@ -1,8 +1,10 @@
 import re
+import io
+import pandas as pd
 from collections import Counter
 from typing import Dict, Any, List, cast
 
-from fastapi import APIRouter, UploadFile, File, Depends
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.storage.database import get_db
@@ -96,6 +98,101 @@ def _extract_hour(ts: str) -> int | None:
     """Pull hour (0-23) from an ISO or Apache timestamp."""
     m = re.search(r'(\d{2}):(\d{2}):\d{2}', ts)
     return int(m.group(1)) if m else None
+
+def analyze_csv_pandas(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """
+    Analyzes a log dataframe for suspicious behavior using pandas.
+    """
+    # Standardize columns to uppercase and remove whitespace
+    df.columns = [c.strip().upper() for c in df.columns]
+    
+    # Required columns: TIMESTAMP, SOURCE IP, METHOD, ENDPOINT, STATUS, SEVERITY
+    # Map 'SOURCE IP' to 'SOURCE_IP' if needed for easier access
+    if 'SOURCE IP' in df.columns:
+        df = df.rename(columns={'SOURCE IP': 'SOURCE_IP'})
+    
+    incidents = []
+    
+    # Ensure columns exist before analyzing
+    cols = df.columns
+    has_ip = 'SOURCE_IP' in cols
+    has_endpoint = 'ENDPOINT' in cols
+    has_status = 'STATUS' in cols
+    has_severity = 'SEVERITY' in cols
+
+    # 1. Repeated failed logins (Status 401/403 on login endpoints)
+    if has_endpoint and has_status and has_ip:
+        login_mask = df['ENDPOINT'].astype(str).str.contains('login|auth|admin|signin', case=False, na=False)
+        failed_mask = df['STATUS'].astype(str).isin(['401', '403', '405'])
+        failed_logins = df[login_mask & failed_mask]
+        if not failed_logins.empty:
+            counts = failed_logins.groupby('SOURCE_IP').size()
+            for ip, count in counts[counts >= 3].items():
+                incidents.append({
+                    'type': 'Brute Force Attempt',
+                    'severity': 'HIGH',
+                    'source_ip': str(ip),
+                    'description': f"Detected {count} suspicious access attempts to login/admin endpoints.",
+                    'timestamp': str(df[df['SOURCE_IP'] == ip]['TIMESTAMP'].iloc[-1]) if 'TIMESTAMP' in cols else '—'
+                })
+
+    # 2. Unusual/Suspicious endpoints
+    if has_endpoint and has_ip:
+        suspicious_patterns = [
+            (r'/etc/passwd|/etc/shadow|/proc/self', 'Path Traversal'),
+            (r'\.env|\.git|backup\.|config\.php', 'Sensitive Data Disclosure'),
+            (r'phpmyadmin|wp-admin|xmlrpc\.php', 'Reconnaissance'),
+            (r'<script|javascript:|onload=', 'XSS Injection'),
+            (r'select\s+|union\s+|insert\s+', 'SQL Injection')
+        ]
+        for pattern, inc_type in suspicious_patterns:
+            matches = df[df['ENDPOINT'].astype(str).str.contains(pattern, case=False, na=False, regex=True)]
+            if not matches.empty:
+                for ip, count in matches.groupby('SOURCE_IP').size().items():
+                    incidents.append({
+                        'type': inc_type,
+                        'severity': 'CRITICAL',
+                        'source_ip': str(ip),
+                        'description': f"IP accessed restricted pattern '{pattern}' {count} times.",
+                        'timestamp': str(matches[matches['SOURCE_IP'] == ip]['TIMESTAMP'].iloc[-1]) if 'TIMESTAMP' in cols else '—'
+                    })
+
+    # 3. Abnormal HTTP status codes (Spike of 500s or 404s)
+    if has_status and has_ip:
+        server_errors = df[df['STATUS'].astype(str).str.startswith('5')]
+        if not server_errors.empty:
+            for ip, count in server_errors.groupby('SOURCE_IP').size().items():
+                if count > 5:
+                    incidents.append({
+                        'type': 'Server-Side Anomalies',
+                        'severity': 'MEDIUM',
+                        'source_ip': str(ip),
+                        'description': f"IP triggered {count} server errors (5xx). Possible fuzzing or exploit attempt.",
+                        'timestamp': str(server_errors[server_errors['SOURCE_IP'] == ip]['TIMESTAMP'].iloc[-1]) if 'TIMESTAMP' in cols else '—'
+                    })
+
+    # 4. High severity events
+    if has_severity and has_ip:
+        high_sev = df[df['SEVERITY'].astype(str).str.upper().isin(['HIGH', 'CRITICAL', 'SEVERE'])]
+        for _, row in high_sev.iterrows():
+            incidents.append({
+                'type': 'Policy Violation',
+                'severity': str(row['SEVERITY']).upper(),
+                'source_ip': str(row['SOURCE_IP']),
+                'description': f"Event logged with high severity at {row.get('ENDPOINT', 'N/A')}.",
+                'timestamp': str(row.get('TIMESTAMP', '—'))
+            })
+
+    # Deduplicate incidents by type and IP
+    unique_incidents = []
+    seen = set()
+    for inc in incidents:
+        key = (inc['type'], inc['source_ip'])
+        if key not in seen:
+            unique_incidents.append(inc)
+            seen.add(key)
+
+    return unique_incidents
 
 
 # ── Upload ─────────────────────────────────────────────────────────────────────
@@ -507,14 +604,61 @@ def _compute_analytics_from_events(all_events, external_incidents: List[Dict[str
 async def upload_logs(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """
     Ingest a log file, parse it into structured events, store, then run detection.
-    On read-only DB (e.g. Vercel), returns analytics in response so dashboard still works.
+    Supports CSV files analyzed with pandas and other text-based logs.
     """
     content = await file.read()
-    text = content.decode("utf-8", errors="ignore")
-    print(f"[upload] {file.filename}: {len(text)} chars")
+    filename = file.filename.lower()
+    
+    # 1. Handle CSV specifically with pandas as requested
+    if filename.endswith('.csv'):
+        try:
+            df = pd.read_csv(io.BytesIO(content))
+            print(f"[upload] CSV detected: {len(df)} rows")
+            detected_incidents = analyze_csv_pandas(df)
+            
+            # Map CSV rows to LogEvent objects for dashboard compatibility
+            # Required columns: TIMESTAMP, SOURCE IP, METHOD, ENDPOINT, STATUS, SEVERITY
+            df.columns = [c.strip().upper() for c in df.columns]
+            if 'SOURCE IP' in df.columns: df = df.rename(columns={'SOURCE IP': 'SOURCE_IP'})
+            
+            mapped_events = []
+            for _, row in df.iterrows():
+                mapped_events.append(LogEvent(
+                    timestamp=str(row.get('TIMESTAMP', '—')),
+                    ip=str(row.get('SOURCE_IP', 'N/A')),
+                    method=str(row.get('METHOD', '—')),
+                    resource=str(row.get('ENDPOINT', '—')),
+                    status_code=str(row.get('STATUS', '—')),
+                    severity=str(row.get('SEVERITY', 'LOW')).upper(),
+                    raw=f"CSV_ROW: {row.to_dict()}",
+                    source="csv_upload"
+                ))
+            
+            # Save to DB if possible
+            try:
+                db.query(LogEvent).delete()
+                for ev in mapped_events:
+                    db.add(ev)
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                print(f"[upload] DB write skipped for CSV: {e}")
+                
+            analytics = _compute_analytics_from_events(mapped_events, external_incidents=detected_incidents)
+            return {
+                "message": "CSV logs analyzed successfully with pandas",
+                "events_saved": len(mapped_events),
+                "incidents_created": len(detected_incidents),
+                "analytics": analytics
+            }
+        except Exception as e:
+            print(f"CSV Analysis error: {e}")
+            raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}")
 
+    # 2. Fallback to default text parser for non-CSV files
+    text = content.decode("utf-8", errors="ignore")
     parsed_events = parse_logs(text)
-    print(f"[upload] parsed {len(parsed_events)} events")
+    print(f"[upload] parsed {len(parsed_events)} events from text log")
 
     if not parsed_events:
         return {"message": "No parseable events found in file", "events_saved": 0, "incidents_created": 0}

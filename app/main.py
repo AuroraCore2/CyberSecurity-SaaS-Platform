@@ -1,5 +1,15 @@
 import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
+
+# Load environment variables from .env file if it exists
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+dotenv_path = os.path.join(BASE_DIR, '.env')
+if os.path.exists(dotenv_path):
+    print(f"Loading environment from {dotenv_path}")
+    load_dotenv(dotenv_path=dotenv_path)
+else:
+    print(f"No .env file found at {dotenv_path}")
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from app.api import logs, incidents, chat
@@ -54,13 +64,15 @@ app.include_router(logs.router)
 app.include_router(incidents.router)
 app.include_router(chat.router)
 
-# Resolve frontend path relative to this file (works on Railway)
+# Resolve frontend path relative to this file
+# Works locally, on Railway, and handles Vercel serverless environment
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_PATH = os.path.join(BASE_DIR, "app", "frontend", "index.html")
 
-@app.get("/health")
+# Root path for Vercel compatibility
+@app.get("/api/health")
 def health_check():
-    return JSONResponse({"status": "ok"})
+    return JSONResponse({"status": "ok", "engine": "Groq-Llama3"})
 
 @app.get("/")
 def read_root():

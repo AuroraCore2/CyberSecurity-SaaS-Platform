@@ -1699,6 +1699,35 @@
         // DASHBOARD
         // ============================================================
         // ============================================================
+        // API CONFIGURATION & FAILOVER LOGIC
+        // ============================================================
+        const RAILWAY_API = window.location.origin; // Assume Railway serves the UI
+        const VERCEL_API = 'https://threatmind-backup.vercel.app'; // Backup URL placeholder
+
+        async function fetchWithFailover(endpoint, options = {}) {
+            // Ensure endpoint starts with /
+            if (!endpoint.startsWith('/')) endpoint = '/' + endpoint;
+
+            // 1. Try Primary (Railway)
+            try {
+                const response = await fetch(`${RAILWAY_API}${endpoint}`, options);
+                if (response.ok) return response;
+            } catch (err) {
+                console.warn(`Railway API failed for ${endpoint}, trying Vercel...`);
+            }
+
+            // 2. Try Backup (Vercel)
+            try {
+                const response = await fetch(`${VERCEL_API}${endpoint}`, options);
+                if (response.ok) return response;
+                throw new Error(`Vercel fallback failed with status ${response.status}`);
+            } catch (err) {
+                console.error(`All API endpoints failed for ${endpoint}`);
+                throw err;
+            }
+        }
+
+        // ============================================================
         // DASHBOARD — API-DRIVEN ANALYTICS
         // ============================================================
         let charts = {};
@@ -1707,33 +1736,27 @@
         async function processFile(file) {
             document.getElementById('loading-overlay').style.display = 'flex';
             try {
-                // 1. Upload file to backend
+                // 1. Upload file to backend with failover
                 const formData = new FormData();
                 formData.append('file', file);
-                const uploadRes = await fetch('/logs/upload', { method: 'POST', body: formData });
-                if (!uploadRes.ok) {
-                    const err = await uploadRes.json().catch(() => ({}));
-                    throw new Error(err.error || `Upload failed: ${uploadRes.status}`);
-                }
+                
+                const uploadRes = await fetchWithFailover('/logs/upload', { 
+                    method: 'POST', 
+                    body: formData 
+                });
+                
                 const uploadData = await uploadRes.json();
                 if (uploadData.error) throw new Error(uploadData.error);
 
-                // 2. Use analytics from upload response (when DB is read-only) or fetch from API
-                let analytics;
-                if (uploadData.analytics) {
-                    analytics = uploadData.analytics;
-                } else {
-                    const analyticsRes = await fetch('/logs/analytics');
-                    if (!analyticsRes.ok) throw new Error(`Analytics fetch failed: ${analyticsRes.status}`);
-                    analytics = await analyticsRes.json();
-                    if (analytics.error) throw new Error(analytics.error);
-                }
-
+                // 2. Use analytics from upload response
+                let analytics = uploadData.analytics;
+                
                 // 3. Render real data
                 renderFromAPI(analytics);
+                showToast('Log analysis complete. Suspicious incidents extracted.', 'success');
             } catch (err) {
                 console.error('[ThreatMind] Upload error:', err);
-                showToast('⚠ ' + err.message, 'error');
+                showToast('⚠ Analysis Error: ' + err.message, 'error');
             } finally {
                 document.getElementById('loading-overlay').style.display = 'none';
             }
@@ -2160,53 +2183,38 @@ RESPONSE FORMAT RULES (follow strictly):
             if (!msg) return;
             input.value = '';
 
-            const ts = new Date().toLocaleTimeString();
             appendOutput(`<div class="cmd-line"><span class="prompt">oracle@threatmind:~$</span> <span class="cmd-text">${escHtml(msg)}</span></div>`);
-            chatHistory.push({ role: 'user', content: msg });
 
             const btn = document.getElementById('send-btn');
             btn.disabled = true;
             document.getElementById('typing').classList.add('active');
 
             try {
-                const res = await fetch('/api/chat', {
+                const res = await fetchWithFailover('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        model: 'claude-sonnet-4-20250514',
-                        max_tokens: 1000,
-                        system: SYS_PROMPT,
-                        messages: chatHistory
-                    })
+                    body: JSON.stringify({ message: msg })
                 });
                 const data = await res.json();
-                if (data.error) throw new Error(data.error.message);
-
-                const reply = data.content?.map(b => b.text || '').join('') || '[NULL_RESPONSE]';
-                chatHistory.push({ role: 'assistant', content: reply });
+                const reply = data.content?.[0]?.text || '[NULL_RESPONSE]';
+                
                 document.getElementById('typing').classList.remove('active');
-
-                // Format as CMD output
-                const formatted = escSimple(reply.replace(/<br\s*\/?>/gi, '\n'))
-                    .replace(/──+/g, '<span style="color:#222">──────────────────────────────────────</span>')
-                    .replace(/\[([A-Z_]+)\]/g, '<span style="color:#ffcc00">[$1]</span>')
-                    .replace(/  &gt;&gt;  /g, '  <span style="color:var(--neon-red)">&gt;&gt;</span>  ');
 
                 const outputDiv = document.createElement('div');
                 outputDiv.className = 'cmd-output';
                 document.getElementById('chat-output').appendChild(outputDiv);
-                await terminalType(outputDiv, formatted);
+                await terminalType(outputDiv, reply);
 
             } catch (err) {
                 document.getElementById('typing').classList.remove('active');
-                appendOutput(`<div class="cmd-output error">[ERROR] ${escHtml(err.message)}<br>Check network connection or API configuration.</div>`);
+                appendOutput(`<div class="cmd-output error">[ERROR] AI connection failed: ${escHtml(err.message)}</div>`);
             }
             btn.disabled = false;
         }
 
         function showToast(msg, type = 'info') {
             const t = document.createElement('div');
-            const color = type === 'error' ? 'var(--neon-red)' : 'var(--cyber-blue)';
+            const color = type === 'error' ? 'var(--neon-red)' : type === 'success' ? '#00ff88' : 'var(--cyber-blue)';
             t.style.cssText = `position:fixed;bottom:28px;right:28px;z-index:99999;
         padding:12px 22px;background:rgba(0,0,0,0.92);border:1px solid ${color};
         color:${color};font-family:'JetBrains Mono';font-size:0.78rem;border-radius:6px;
@@ -2257,166 +2265,47 @@ RESPONSE FORMAT RULES (follow strictly):
             document.getElementById('chat-input').value = q;
             sendChat();
         }
+
         async function explainIncident(type, severity, ip, description, precomputed = '', timestamp = '', endpoint = '', method = '', status = '') {
             const overlay = document.getElementById('oracle-insight-overlay');
             const content = document.getElementById('oracle-insight-content');
 
             overlay.style.display = 'flex';
             content.innerHTML = `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:200px;">
-        <div class="logo-mark pulse-sync" style="width:40px; height:40px; margin-bottom:15px;">
-            <svg width="40" height="40" viewBox="0 0 32 32" fill="none">
-                <circle cx="16" cy="16" r="5" stroke="#ff003c" stroke-width="1.5" fill="rgba(255,0,60,0.1)"/>
-                <circle cx="16" cy="16" r="2" fill="#ff003c"/>
-            </svg>
-        </div>
-        <div style="color:var(--cyber-blue); font-size:0.75rem; letter-spacing:2px; animation:blink-dot 1s infinite;">NEURAL_PROCESSOR_ACTIVE...</div>
-    </div>`;
-
-            // FALLBACK CHECK: If essential data is missing, show the required fallback message
-            if (!type || !severity || !ip || !description || ip === 'Unknown' || ip === '—') {
-                content.innerHTML = `
-            <div style="margin-bottom:25px; border-bottom:1px solid rgba(200,220,255,0.08); padding-bottom:15px;">
-                <div style="font-family:'Space Grotesk'; font-size:1.1rem; font-weight:700; color:#fff; margin-bottom:5px; letter-spacing:1px;">
-                    DATA_INSUFFICIENCY_ALERT
+                <div class="logo-mark pulse-sync" style="width:40px; height:40px; margin-bottom:15px;">
+                    <svg width="40" height="40" viewBox="0 0 32 32" fill="none">
+                        <circle cx="16" cy="16" r="5" stroke="#ff003c" stroke-width="1.5" fill="rgba(255,0,60,0.1)"/>
+                        <circle cx="16" cy="16" r="2" fill="#ff003c"/>
+                    </svg>
                 </div>
-            </div>
-            <div class="oracle-analysis-block"><span style="color:#ffcc00; font-weight:700;">[ANALYSIS]</span>
-Oracle could not generate a complete explanation because the incident data is incomplete.
-
-<span style="color:#ffcc00; font-weight:700;">[MITIGATION]</span>
-<span style="color:var(--neon-red); font-weight:700;">&gt;&gt;</span> Review the uploaded dataset for missing fields
-<span style="color:var(--neon-red); font-weight:700;">&gt;&gt;</span> Ensure incident logs include IP, endpoint, and request type
-<span style="color:var(--neon-red); font-weight:700;">&gt;&gt;</span> Re-run analysis after correcting the dataset
-
-<span style="color:#ffcc00; font-weight:700;">[VERDICT]</span>
-THREAT_STATUS: INSUFFICIENT_DATA</div>
-            <div style="margin-top:30px; display:flex; justify-content:flex-end; gap:12px;">
-                <button class="btn" onclick="closeOracleOverlay()" style="border-color:var(--neon-red); color:var(--neon-red); background:rgba(255,0,60,0.05);">DISMISS</button>
+                <div style="color:var(--cyber-blue); font-size:0.75rem; letter-spacing:2px; animation:blink-dot 1s infinite;">GROQ_LLAMA3_PROCESSING...</div>
             </div>`;
-                return;
-            }
 
-            const prompt = `[CONTEXT]
-Incident Type: ${type}
-Severity: ${severity}
-Source IP: ${ip}
-Description: ${description}
-Timestamp: ${timestamp}
-Endpoint: ${endpoint}
-Method: ${method}
-Status: ${status}
-Raw Evidence: ${precomputed}
-
-[INSTRUCTION]
-Analyze this incident in simple security terms. Every explanation MUST strictly follow this layout:
-
-[ANALYSIS]
-Short explanation describing:
-* what happened
-* why it was flagged
-* what the suspicious behavior indicates
-
-[MITIGATION]
->> mitigation step 1
->> mitigation step 2
->> mitigation step 3
-
-[VERDICT]
-THREAT_CONFIRMED: <classification>
-
-Example classification values:
-* ACTIVE_RECONNAISSANCE
-* BRUTE_FORCE_ATTEMPT
-* SUSPICIOUS_ENDPOINT_ACCESS
-* MALICIOUS_AUTOMATION
-* POTENTIAL_CREDENTIAL_ATTACK
-
-If the provided context is insufficient to generate a complete analysis, you MUST return this exact fallback message:
-
-[ANALYSIS]
-Oracle could not generate a complete explanation because the incident data is incomplete.
-
-[MITIGATION]
->> Review the uploaded dataset for missing fields
->> Ensure incident logs include IP, endpoint, and request type
->> Re-run analysis after correcting the dataset
-
-[VERDICT]
-THREAT_STATUS: INSUFFICIENT_DATA
-
-Keep it concise, technical, and strictly formatted.`;
+            const incidentSummary = `Type: ${type}, Severity: ${severity}, IP: ${ip}, Endpoint: ${endpoint}, Method: ${method}, Status: ${status}, Description: ${description}`;
 
             try {
-                const res = await fetch('/api/chat', {
+                const res = await fetchWithFailover('/oracle', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        model: 'gpt-4o-mini',
-                        max_tokens: 600,
-                        system: `You are the ThreatMind ORACLE TERMINAL. You provide elite-level security incident analysis.
-Follow the CMD formatting rules:
-- No markdown headers.
-- Use [HEADER] for sections.
-- Use >> for list items.
-- Plain text terminal style.`,
-                        messages: [{ role: 'user', content: prompt }]
-                    })
+                    body: JSON.stringify({ incident: incidentSummary })
                 });
 
                 const data = await res.json();
-                if (data.error) throw new Error(data.error.message);
-
-                const reply = data.content?.map(b => b.text || '').join('') || '[NULL_RESPONSE]';
-
-                // Final presentation
-                const formattedBody = escSimple(reply.replace(/<br\s*\/?>/gi, '\n'))
-                    .replace(/\[([A-Z_]+)\]/g, '<span style="color:#ffcc00; font-weight:700;">[$1]</span>')
-                    .replace(/&gt;&gt;/g, '<span style="color:var(--neon-red); font-weight:700;">&gt;&gt;</span>');
+                const reply = data.content?.[0]?.text || '[NULL_RESPONSE]';
 
                 content.innerHTML = `
-            <div style="margin-bottom:25px; border-bottom:1px solid rgba(200,220,255,0.08); padding-bottom:15px;">
-                <div style="font-family:'Space Grotesk'; font-size:1.1rem; font-weight:700; color:#fff; margin-bottom:5px; letter-spacing:1px;">
-                    ${type.toUpperCase()}
-                </div>
-                <div style="display:flex; align-items:center; gap:10px; font-family:'JetBrains Mono'; font-size:0.72rem;">
-                    <span style="color:var(--text-low);">SOURCE_ORIGIN:</span>
-                    <span style="color:var(--cyber-blue); font-weight:700;">${ip}</span>
-                    <span style="color:rgba(255,255,255,0.1);">|</span>
-                    <span style="color:var(--text-low);">THREAT_LEVEL:</span>
-                    <span class="sev-badge ${severity === 'CRITICAL' ? 'sev-critical' : severity === 'HIGH' ? 'sev-high' : 'sev-medium'}">${severity}</span>
-                </div>
-            </div>
-
-            <div class="oracle-analysis-block">${formattedBody}</div>
-
-            <div style="margin-top:30px; display:flex; justify-content:flex-end; gap:12px;">
-                <button class="btn" onclick="closeOracleOverlay()" style="border-color:var(--neon-red); color:var(--neon-red); background:rgba(255,0,60,0.05);">ACKNOWLEDGE & CLOSE</button>
-                <button class="btn" style="border-color:var(--cyber-blue); color:var(--cyber-blue); background:rgba(0,242,255,0.05);" 
-                    onclick="continueInChat('${escSimple(type)}', '${escSimple(severity)}', '${escSimple(ip)}', \`${escSimple(description)}\`, \`${escSimple(reply)}\`)">
-                    CONTINUE IN CHAT →
-                </button>
-            </div>
-        `;
+                    <div style="margin-bottom:25px; border-bottom:1px solid rgba(200,220,255,0.08); padding-bottom:15px;">
+                        <div style="font-family:'Space Grotesk'; font-size:1.1rem; font-weight:700; color:#fff; margin-bottom:5px; letter-spacing:1px;">
+                            ORACLE ANALYSIS: ${type.toUpperCase()}
+                        </div>
+                    </div>
+                    <div class="oracle-analysis-block" style="white-space: pre-wrap;">${escHtml(reply)}</div>
+                    <div style="margin-top:30px; display:flex; justify-content:flex-end; gap:12px;">
+                        <button class="btn" onclick="closeOracleOverlay()" style="border-color:var(--neon-red); color:var(--neon-red); background:rgba(255,0,60,0.05);">DISMISS</button>
+                    </div>
+                `;
             } catch (err) {
-                content.innerHTML = `
-            <div style="margin-bottom:25px; border-bottom:1px solid rgba(200,220,255,0.08); padding-bottom:15px;">
-                <div style="font-family:'Space Grotesk'; font-size:1.1rem; font-weight:700; color:#fff; margin-bottom:5px; letter-spacing:1px;">
-                    ANALYSIS_FAILURE
-                </div>
-            </div>
-            <div class="oracle-analysis-block"><span style="color:#ffcc00; font-weight:700;">[ANALYSIS]</span>
-Oracle could not generate a complete explanation because the incident data is incomplete.
-
-<span style="color:#ffcc00; font-weight:700;">[MITIGATION]</span>
-<span style="color:var(--neon-red); font-weight:700;">&gt;&gt;</span> Review the uploaded dataset for missing fields
-<span style="color:var(--neon-red); font-weight:700;">&gt;&gt;</span> Ensure incident logs include IP, endpoint, and request type
-<span style="color:var(--neon-red); font-weight:700;">&gt;&gt;</span> Re-run analysis after correcting the dataset
-
-<span style="color:#ffcc00; font-weight:700;">[VERDICT]</span>
-THREAT_STATUS: INSUFFICIENT_DATA</div>
-            <div style="margin-top:30px; display:flex; justify-content:flex-end; gap:12px;">
-                <button class="btn" onclick="closeOracleOverlay()" style="border-color:var(--neon-red); color:var(--neon-red); background:rgba(255,0,60,0.05);">DISMISS</button>
-            </div>`;
+                content.innerHTML = `<div class="oracle-analysis-block error">[ERROR] Oracle failed: ${escHtml(err.message)}</div>`;
             }
         }
 
