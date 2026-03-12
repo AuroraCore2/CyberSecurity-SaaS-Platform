@@ -504,6 +504,7 @@ async def upload_logs(file: UploadFile = File(...), db: Session = Depends(get_db
 
     db_ok = False
     incidents = 0
+    detected = []
 
     try:
         deleted = db.query(LogEvent).delete()
@@ -519,32 +520,34 @@ async def upload_logs(file: UploadFile = File(...), db: Session = Depends(get_db
         db.commit()
         print(f"[upload] committed {len(parsed_events)} events")
         db_ok = True
+        
         try:
-            # Run detection on newly uploaded events only (more efficient and targeted)
+            # Run detection on newly uploaded events only
             detected = run_detection(db, parsed_events)
             incidents = len(detected)
         except Exception as e:
             print(f"[upload] detection error: {e}")
+            detected = []
             incidents = 0
+            
     except Exception as e:
         print(f"[upload] database write unavailable (read-only?): {e}")
         db.rollback()
         # Fallback: compute analytics in-memory for serverless/read-only environments
         analytics = _compute_analytics_from_events(parsed_events)
         return {
-            "message": "Logs analysed successfully",
+            "message": "Logs analysed successfully (In-Memory Fallback)",
             "events_saved": len(parsed_events),
             "incidents_created": 0,
             "analytics": analytics,
         }
 
-    if db_ok:
-        return {
-            "message": "Logs analysed successfully",
-            "events_saved": len(parsed_events),
-            "incidents_created": incidents,
-            "analytics": _compute_analytics_from_events(parsed_events, external_incidents=detected)
-        }
+    return {
+        "message": "Logs analysed successfully",
+        "events_saved": len(parsed_events),
+        "incidents_created": incidents,
+        "analytics": _compute_analytics_from_events(parsed_events, external_incidents=detected)
+    }
 
 
 # ── Raw log list ───────────────────────────────────────────────────────────────
