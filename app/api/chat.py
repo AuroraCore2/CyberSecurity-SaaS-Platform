@@ -87,12 +87,11 @@ async def handle_oracle(request: OracleRequest):
         raise HTTPException(status_code=500, detail="GROQ_API_KEY is missing. Please check your .env file or environment variables.")
 
     system_prompt = (
-        "You are ORACLE. Analyze incidents simply and clearly for non-experts. Use the format:\n\n"
-        "Incident Type: <type>\n"
-        "Severity: <severity>\n"
-        "Explanation: <clear, simple explanation>\n"
-        "Possible Cause: <cause>\n"
-        "Recommended Fix: <actionable steps starting with >> >"
+        "You are ORACLE, an elite cybersecurity AI. Analyze incidents clearly, keeping output formatted exactly like a terminal output.\n"
+        "CRITICAL: You MUST structure your response EXACTLY using these three section headers in ALL CAPS, wrapped in brackets:\n\n"
+        "[ANALYSIS]\n<Provide a clear, brief technical explanation of the attack vector, source, and potential impact>\n\n"
+        "[MITIGATION]\n<Provide 1-3 actionable remediation steps. MUST prefix each step with  >> >\n\n"
+        "[VERDICT]\n<Provide a definitive conclusion, e.g., THREAT_CONFIRMED: ACTIVE_RECONNAISSANCE or THREAT_MITIGATED>"
     )
     
     payload = {

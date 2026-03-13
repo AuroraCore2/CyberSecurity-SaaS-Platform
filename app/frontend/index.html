@@ -600,7 +600,7 @@
         }
 
         .chat-window {
-            height: 505px;
+            height: 510px;
             background: #000;
             border: 1px solid var(--border-line);
             display: flex;
@@ -1911,7 +1911,7 @@
             }
 
             // Forensics table
-            const rows = data.forensics_table || [];
+            const rows = (data.forensics_table || []).slice(0, 300);
             let htmlChunk = '';
             for (const r of rows) {
                 const s = (r.severity || 'LOW').toUpperCase();
@@ -2223,6 +2223,20 @@ RESPONSE FORMAT RULES (follow strictly):
             const out = document.getElementById('chat-output');
             out.innerHTML += html;
             setTimeout(() => { out.scrollTop = out.scrollHeight; }, 30);
+        }
+
+        async function fetchWithFailover(endpoint, options) {
+            try {
+                // Try Vercel /api prefix first
+                let res = await fetch('/api' + endpoint, options);
+                if (res.ok) return res;
+                console.warn('/api fetch returned non-ok status:', res.status);
+            } catch (e) {
+                console.warn('/api fetch failed, trying local direct path...', e);
+            }
+            
+            // Fallback to local direct path
+            return await fetch(endpoint, options);
         }
 
         async function sendChat() {
