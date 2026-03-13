@@ -515,8 +515,8 @@
         }
 
         #oracle-insight-content {
-            padding: 18px 25px;
-            max-height: 60vh;
+            padding: 10px 20px;
+            max-height: 65vh;
             overflow-y: auto;
             font-family: 'JetBrains Mono';
             color: var(--text-high);
@@ -2297,36 +2297,37 @@ RESPONSE FORMAT RULES (follow strictly):
             // Function to render the analysis result
             const renderResult = (reply) => {
                 content.innerHTML = `
-                    <div style="margin-bottom:25px; border-bottom:1px solid rgba(200,220,255,0.08); padding-bottom:15px;">
-                        <div style="font-family:'Space Grotesk'; font-size:1.6rem; font-weight:700; color:#fff; margin-bottom:12px; letter-spacing:1px; text-transform:uppercase;">
+                    <div style="margin-bottom:12px; border-bottom:1px solid rgba(200,220,255,0.08); padding-bottom:8px;">
+                        <div style="font-family:'Space Grotesk'; font-size:1.4rem; font-weight:700; color:#fff; margin-bottom:8px; letter-spacing:1px; text-transform:uppercase;">
                             ${type}
                         </div>
-                        <div style="display:flex; align-items:center; gap:12px; font-family:'JetBrains Mono'; font-size:0.75rem; letter-spacing:1px;">
+                        <div style="display:flex; align-items:center; gap:12px; font-family:'JetBrains Mono'; font-size:0.7rem; letter-spacing:1px;">
                             <span style="color:var(--text-low);">SOURCE_ORIGIN:</span>
                             <span style="color:var(--cyber-blue); font-weight:700;">${ip}</span>
                             <span style="color:rgba(255,255,255,0.1); margin:0 5px;">|</span>
                             <span style="color:var(--text-low);">THREAT_LEVEL:</span>
                             <span class="sev-badge ${severity === 'CRITICAL' ? 'sev-critical' : severity === 'HIGH' ? 'sev-high' : 'sev-medium'}" 
-                                  style="font-size:0.65rem; padding:2px 10px; border-radius:4px;">${severity}</span>
+                                  style="font-size:0.6rem; padding:1px 8px; border-radius:3px;">${severity}</span>
                         </div>
                     </div>
                     
-                    <div class="oracle-analysis-block">
+                    <div class="oracle-analysis-block" style="padding: 15px; line-height: 1.5; margin: 0;">
                         ${escHtml(reply)
-                            .replace(/\[([A-Z_]+)\]/g, '<div style="color:#ffcc00; font-weight:700; margin-top:10px; margin-bottom:4px;">[$1]</div>')
+                            .replace(/\[ANALYSIS\]/g, '<div style="color:#ffcc00; font-weight:700; margin-bottom:4px;">[ANALYSIS]</div>')
+                            .replace(/\[([A-Z_]+)\]/g, '<div style="color:#ffcc00; font-weight:700; margin-top:14px; margin-bottom:4px;">[$1]</div>')
                             .replace(/&gt;&gt;/g, '<span style="color:var(--neon-red); font-weight:700; margin-right:8px;">&gt;&gt;</span>')
-                            .replace(/\n\n/g, '<div style="margin-bottom:8px;"></div>')
-                            .replace(/\n/g, '<div style="margin-bottom:2px;"></div>')
+                            .replace(/<br><br>/g, '<div style="margin-bottom:8px;"></div>')
+                            .replace(/<br>/g, '<div style="margin-bottom:2px;"></div>')
                         }
                     </div>
 
-                    <div style="margin-top: 15px; display:flex; justify-content:flex-end; gap:15px;">
+                    <div style="margin-top: 12px; display:flex; justify-content:flex-end; gap:10px;">
                         <button class="btn" onclick="closeOracleOverlay()" 
-                                style="border-color:var(--neon-red); color:var(--neon-red); background:rgba(255,0,60,0.05); padding:8px 20px; font-size:0.75rem; letter-spacing:1.5px;">
+                                style="border-color:var(--neon-red); color:var(--neon-red); background:rgba(255,0,60,0.05); padding:6px 16px; font-size:0.7rem; letter-spacing:1px;">
                             ACKNOWLEDGE & CLOSE
                         </button>
                         <button class="btn" 
-                                style="border-color:var(--cyber-blue); color:var(--cyber-blue); background:rgba(0,242,255,0.05); padding:8px 20px; font-size:0.75rem; letter-spacing:1.5px;" 
+                                style="border-color:var(--cyber-blue); color:var(--cyber-blue); background:rgba(0,242,255,0.05); padding:6px 16px; font-size:0.7rem; letter-spacing:1px;" 
                                 onclick="continueInChat('${escJs(type)}', '${escJs(severity)}', '${escJs(ip)}', \`${escJs(description)}\`, \`${escJs(reply)}\`)">
                             CONTINUE IN CHAT →
                         </button>
