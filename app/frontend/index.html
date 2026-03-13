@@ -2294,6 +2294,11 @@ RESPONSE FORMAT RULES (follow strictly):
                     body: JSON.stringify({ message: msg })
                 });
                 const data = await res.json();
+                
+                if (!res.ok) {
+                    throw new Error(data.detail || `HTTP Error ${res.status}`);
+                }
+
                 let reply = data.content?.[0]?.text || '[NULL_RESPONSE]';
 
                 // Refined parsing for bold tags
@@ -2449,7 +2454,7 @@ RESPONSE FORMAT RULES (follow strictly):
                         <circle cx="16" cy="16" r="2" fill="#ff003c"/>
                     </svg>
                 </div>
-                <div style="color:var(--cyber-blue); font-size:0.75rem; letter-spacing:2px; animation:blink-dot 1s infinite;">GROQ_LLAMA3_PROCESSING...</div>
+                <div style="color:var(--cyber-blue); font-size:0.75rem; letter-spacing:2px; animation:blink-dot 1s infinite;">ORACLE_PROCESSING...</div>
             </div>`;
 
             const incidentSummary = `Type: ${type}, Severity: ${severity}, IP: ${ip}, Endpoint: ${endpoint}, Method: ${method}, Status: ${status}, Description: ${description}${rawLogContext}`;
@@ -2462,6 +2467,11 @@ RESPONSE FORMAT RULES (follow strictly):
                 });
 
                 const data = await res.json();
+                
+                if (!res.ok) {
+                    throw new Error(data.detail || `HTTP Error ${res.status}`);
+                }
+
                 const reply = data.content?.[0]?.text || '[NULL_RESPONSE]';
                 renderResult(reply);
             } catch (err) {
