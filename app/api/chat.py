@@ -37,7 +37,7 @@ async def handle_chat(request: SimpleChatRequest):
     system_prompt = "You are a cybersecurity AI assistant helping users understand attacks, logs, vulnerabilities, and suspicious activity."
     
     payload = {
-        "model": "llama3-8b-8192",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": request.message}
@@ -92,7 +92,7 @@ async def handle_oracle(request: OracleRequest):
     )
     
     payload = {
-        "model": "llama3-8b-8192",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Analyze this incident: {request.incident}"}
