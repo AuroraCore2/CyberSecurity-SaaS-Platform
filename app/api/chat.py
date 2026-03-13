@@ -14,7 +14,8 @@ def get_groq_key():
     if not key:
         print("GROQ_API_KEY not found in os.getenv, trying load_dotenv...")
         from dotenv import load_dotenv
-        load_dotenv()
+        env_path = os.path.join(os.path.dirname(__file__), '../../.env')
+        load_dotenv(env_path)
         key = os.getenv("GROQ_API_KEY")
     
     if key:
