@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from app.api.threat_intel import router as threat_intel_router 
 
 from app.api import logs, incidents
 from app.storage.database import Base, engine
@@ -52,6 +53,7 @@ from app.api import logs, incidents, chat
 app.include_router(logs.router)
 app.include_router(incidents.router)
 app.include_router(chat.router)
+app.include_router(threat_intel_router)
 
 # Mount frontend directory for static assets
 # Actually, since everything is in index.html, we just need to serve the file

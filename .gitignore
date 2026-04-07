@@ -1,0 +1,20 @@
+# Secret keys - never upload these!
+.env
+
+# Virtual environment - no need to upload
+venv/
+
+# Python cache files - auto-generated, not needed
+__pycache__/
+*.pyc
+*.pyo
+
+# Database files
+*.db
+
+# VS Code settings
+.vscode/
+
+# Windows junk files
+Thumbs.db
+desktop.ini
