@@ -1502,6 +1502,7 @@
                                     <th
                                         style="text-align:right; padding:12px; font-weight:600; font-size:0.6rem; letter-spacing:1px; color:#555;">
                                         SEVERITY</th>
+                                    <th style="text-align:left; padding:12px; font-weight:600; font-size:0.6rem; letter-spacing:1px; color:var(--cyber-blue);">THREAT INTEL</th>
                                 </tr>
                             </thead>
                             <tbody id="log-tbody"></tbody>
@@ -1890,6 +1891,7 @@
             
             // Render first chunk immediately
             renderLogChunk(150);
+            setTimeout(() => enrichForensicsTable(), 500);
 
             // Infinite Scroll Listener
             const tableContainer = document.getElementById('forensics-table-container');
@@ -1902,6 +1904,7 @@
                     // Trigger chunk load when user scrolls within 200px of bottom
                     if (this.scrollTop + this.clientHeight >= this.scrollHeight - 200) {
                         renderLogChunk(150);
+                        setTimeout(() => enrichForensicsTable(), 300);
                     }
                 });
             }
@@ -1923,13 +1926,14 @@
                 const s = (r.severity || 'LOW').toUpperCase();
                 const cls = s === 'CRITICAL' ? 'sev-critical' : s === 'HIGH' ? 'sev-high' : s === 'MEDIUM' ? 'sev-medium' : 'sev-low';
                 const ipCol = (s === 'CRITICAL' || s === 'HIGH') ? 'color:var(--neon-red)' : '';
-                htmlChunk += `<tr>
+                htmlChunk += `<tr data-row-ip="${escHtml(r.ip || '')}">
             <td style="color:#555; padding:12px;">${escHtml(r.timestamp || '')}</td>
             <td style="${ipCol}; padding:12px;">${escHtml(r.ip || 'N/A')}</td>
             <td style="padding:12px;">${escHtml(r.method || '—')}</td>
             <td style="color:#999; padding:12px;">${escHtml(r.endpoint || '—')}</td>
             <td style="text-align:right; padding:12px;">${escHtml(r.status || '—')}</td>
             <td style="text-align:right; padding:12px;"><span class="sev-badge ${cls}">${s}</span></td>
+            <td style="padding:12px;" class="intel-cell"></td>
         </tr>`;
             }
             
