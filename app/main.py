@@ -13,6 +13,7 @@ else:
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from app.api import logs, incidents, chat
+from app.api.threat_intel import router as threat_intel_router
 from app.storage.database import Base, engine
 
 # Create tables (safe on first run; existing tables are left untouched)
@@ -63,6 +64,7 @@ app.add_middleware(
 app.include_router(logs.router)
 app.include_router(incidents.router)
 app.include_router(chat.router)
+app.include_router(threat_intel_router) 
 
 # Resolve frontend path relative to this file
 # Works locally, on Railway, and handles Vercel serverless environment

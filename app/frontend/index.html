@@ -1766,6 +1766,97 @@
             const response = await fetch(`${RAILWAY_API}${endpoint}`, options);
             return response;
         }
+        // ============================================================
+// THREAT INTEL ENRICHMENT — VirusTotal + AbuseIPDB
+// ============================================================
+const enrichmentCache = {};
+
+async function enrichIP(ip) {
+    // Skip private/internal IPs
+    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.|0\.0\.0\.0)/.test(ip)) {
+        return null;
+    }
+    if (enrichmentCache[ip]) return enrichmentCache[ip];
+
+    try {
+        const res = await fetchWithFailover(`/api/threat-intel/ip/${ip}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        enrichmentCache[ip] = data;
+        return data;
+    } catch (e) {
+        return null;
+    }
+}
+
+function buildIntelBadge(data) {
+    if (!data || data.error) return '';
+    const vt = data.virustotal || {};
+    const ab = data.abuseipdb || {};
+    const verdict = data.verdict || '';
+    const score = data.threat_score ?? 0;
+
+    const color = score >= 70 ? 'var(--neon-red)' : score >= 30 ? '#ffcc00' : '#00ff88';
+    const vtMal = vt.malicious ?? '?';
+    const abScore = ab.abuse_score ?? '?';
+
+    return `
+        <div class="intel-badge" style="
+            display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;
+            margin-top:5px; font-family:'JetBrains Mono'; font-size:0.58rem;">
+            <span style="
+                background:rgba(0,0,0,0.6); border:1px solid ${color};
+                color:${color}; padding:1px 7px; border-radius:3px; letter-spacing:0.5px;
+                font-weight:700;">
+                ${verdict}
+            </span>
+            <span style="
+                background:rgba(0,242,255,0.06); border:1px solid rgba(0,242,255,0.2);
+                color:var(--cyber-blue); padding:1px 7px; border-radius:3px;">
+                VT: ${vtMal} engines
+            </span>
+            <span style="
+                background:rgba(255,0,60,0.06); border:1px solid rgba(255,0,60,0.2);
+                color:#ff7755; padding:1px 7px; border-radius:3px;">
+                ABUSE: ${abScore}%
+            </span>
+            ${ab.isp ? `<span style="color:#444; font-size:0.55rem;">${escHtml(ab.isp)}</span>` : ''}
+        </div>`;
+}
+
+async function enrichIncidentCards() {
+    const cards = document.querySelectorAll('[data-enrich-ip]');
+    for (const card of cards) {
+        const ip = card.getAttribute('data-enrich-ip');
+        const container = card.querySelector('.intel-slot');
+        if (!container || container.dataset.done) continue;
+        container.dataset.done = '1';
+        container.innerHTML = `<span style="color:#333; font-family:'JetBrains Mono'; font-size:0.55rem; letter-spacing:1px;">QUERYING INTEL...</span>`;
+        const data = await enrichIP(ip);
+        container.innerHTML = data ? buildIntelBadge(data) : '';
+    }
+}
+
+async function enrichForensicsTable() {
+    const rows = document.querySelectorAll('[data-row-ip]');
+    for (const row of rows) {
+        const ip = row.getAttribute('data-row-ip');
+        const cell = row.querySelector('.intel-cell');
+        if (!cell || cell.dataset.done) continue;
+        cell.dataset.done = '1';
+        const data = await enrichIP(ip);
+        if (!data) { cell.innerHTML = '<span style="color:#333;">—</span>'; continue; }
+        const score = data.threat_score ?? 0;
+        const color = score >= 70 ? 'var(--neon-red)' : score >= 30 ? '#ffcc00' : '#00ff88';
+        cell.innerHTML = `
+            <span style="
+                color:${color}; font-family:'JetBrains Mono'; font-size:0.65rem;
+                font-weight:700; cursor:help;"
+                title="VT: ${data.virustotal?.malicious ?? '?'} malicious | AbuseIPDB: ${data.abuseipdb?.abuse_score ?? '?'}% | ${data.abuseipdb?.isp ?? ''}">
+                ${data.verdict}
+            </span>`;
+    }
+}
 
         // ============================================================
         // DASHBOARD — API-DRIVEN ANALYTICS
@@ -1851,7 +1942,7 @@
                     else if (inc.severity === 'CRITICAL') secBadge = 'IMMEDIATE_ACTION';
 
                     incHtml += `
-            <div style="padding: 8px 16px; ${borderBottom} display: flex; justify-content: space-between; align-items: center; background: var(--glass-core); transition: all 0.2s ease; border-left: 2px solid transparent; width: 100%;" 
+           <div data-enrich-ip="${escHtml(inc.source_ip)}" style="padding: 8px 16px; ${borderBottom} display: flex; justify-content: space-between; align-items: center; background: var(--glass-core); transition: all 0.2s ease; border-left: 2px solid transparent; width: 100%;" 
                  onmouseover="this.style.background='rgba(255,0,60,0.05)'; this.style.borderLeftColor='var(--neon-red)';" 
                  onmouseout="this.style.background='var(--glass-core)'; this.style.borderLeftColor='transparent';">
                 <div style="flex:1; padding-right:15px; min-width: 0;">
@@ -1865,6 +1956,7 @@
                         <span style="opacity:0.6;">SOURCE: </span>
                         <span style="font-weight:700;">${escHtml(inc.source_ip)}</span>
                     </div>
+                    <div class="intel-slot" style="margin-top:4px;"></div>
                 </div>
                 
                 <div style="display:flex; flex-direction:column; align-items:flex-end; gap: 8px; flex-shrink: 0;">
@@ -1881,6 +1973,7 @@
             </div>`;
                 }
                 incidentEl.innerHTML = incHtml;
+                enrichIncidentCards();
             }
 
             // Set up Virtual Chunk Rendering for the Forensics table
