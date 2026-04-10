@@ -1008,6 +1008,163 @@
             width: 100% !important;
             overflow-x: hidden !important;
         }
+
+        /* ---- THREAT INTEL DETAIL OVERLAY ---- */
+        #threat-intel-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 3, 3, 0.8);
+            backdrop-filter: blur(6px);
+            z-index: 6000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .intel-detail-popup {
+            width: 100%;
+            max-width: 1100px;
+            background: rgba(8, 8, 12, 0.97);
+            border: 1px solid rgba(255, 0, 60, 0.35);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 0 60px rgba(255, 0, 60, 0.08), 0 0 30px rgba(255, 0, 60, 0.06), inset 0 0 30px rgba(255, 0, 60, 0.02);
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .intel-detail-header {
+            padding: 14px 20px;
+            background: linear-gradient(135deg, rgba(255, 0, 60, 0.08), rgba(255, 0, 60, 0.04));
+            border-bottom: 1px solid rgba(255, 0, 60, 0.25);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .intel-detail-header h3 {
+            font-family: 'Space Grotesk';
+            font-weight: 700;
+            color: var(--neon-red);
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .intel-detail-body {
+            padding: 24px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .intel-detail-body::-webkit-scrollbar { width: 4px; }
+        .intel-detail-body::-webkit-scrollbar-thumb { background: rgba(0, 242, 255, 0.25); border-radius: 10px; }
+
+        .intel-score-ring {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .intel-score-ring::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .intel-source-card {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .intel-source-card:hover {
+            border-color: rgba(0, 242, 255, 0.2);
+        }
+
+        .intel-source-title {
+            font-family: 'Space Grotesk';
+            font-weight: 700;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .intel-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .intel-stat-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 6px;
+            padding: 10px 12px;
+            text-align: center;
+        }
+
+        .intel-stat-label {
+            font-family: 'JetBrains Mono';
+            font-size: 0.55rem;
+            color: #555;
+            letter-spacing: 1.5px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .intel-stat-value {
+            font-family: 'Space Grotesk';
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .intel-badge-clickable {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .intel-badge-clickable:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.3);
+        }
+
+        .intel-mini-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.05);
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        .intel-mini-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.8s ease;
+        }
+
+        @keyframes scan-line {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
     </style>
 </head>
 
@@ -1415,6 +1572,22 @@
                     </div>
                 </div>
 
+                <!-- Threat Intel Detail Overlay -->
+                <div id="threat-intel-overlay">
+                    <div class="intel-detail-popup">
+                        <div class="intel-detail-header">
+                            <h3>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                                THREAT INTELLIGENCE REPORT
+                            </h3>
+                            <span class="oracle-close" onclick="closeIntelOverlay()">&times;</span>
+                        </div>
+                        <div class="intel-detail-body" id="intel-detail-content">
+                            <!-- Dynamic content injected here -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Metrics -->
                 <div class="metrics-row">
                     <div class="stat-card">
@@ -1502,7 +1675,7 @@
                                     <th
                                         style="text-align:right; padding:12px; font-weight:600; font-size:0.6rem; letter-spacing:1px; color:#555;">
                                         SEVERITY</th>
-                                    <th style="text-align:left; padding:12px; font-weight:600; font-size:0.6rem; letter-spacing:1px; color:var(--cyber-blue);">THREAT INTEL</th>
+                                    <th style="text-align:left; padding:12px; font-weight:600; font-size:0.6rem; letter-spacing:1px; color:var(--neon-red);">THREAT INTEL</th>
                                 </tr>
                             </thead>
                             <tbody id="log-tbody"></tbody>
@@ -1789,39 +1962,232 @@ async function enrichIP(ip) {
     }
 }
 
-function buildIntelBadge(data) {
+function buildIntelBadge(data, ip) {
     if (!data || data.error) return '';
     const vt = data.virustotal || {};
     const ab = data.abuseipdb || {};
     const verdict = data.verdict || '';
     const score = data.threat_score ?? 0;
 
-    const color = score >= 70 ? 'var(--neon-red)' : score >= 30 ? '#ffcc00' : '#00ff88';
+    const color = score >= 70 ? '#ff003c' : score >= 30 ? '#ffcc00' : '#00ff88';
     const vtMal = vt.malicious ?? '?';
+    const vtMalNum = typeof vtMal === 'number' ? vtMal : 0;
+    const vtColor = vtMalNum >= 5 ? '#ff003c' : vtMalNum >= 1 ? '#ffcc00' : '#00ff88';
     const abScore = ab.abuse_score ?? '?';
+    const abScoreNum = typeof abScore === 'number' ? abScore : 0;
+    const abColor = abScoreNum >= 70 ? '#ff003c' : abScoreNum >= 30 ? '#ffcc00' : '#00ff88';
+    const safeIp = escHtml(ip || data.ip || '');
 
     return `
-        <div class="intel-badge" style="
+        <div class="intel-badge intel-badge-clickable" onclick="showIntelDetail('${safeIp}')" style="
             display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;
             margin-top:5px; font-family:'JetBrains Mono'; font-size:0.58rem;">
             <span style="
+                display:inline-flex; align-items:center; gap:4px;
                 background:rgba(0,0,0,0.6); border:1px solid ${color};
                 color:${color}; padding:1px 7px; border-radius:3px; letter-spacing:0.5px;
                 font-weight:700;">
                 ${verdict}
             </span>
             <span style="
-                background:rgba(0,242,255,0.06); border:1px solid rgba(0,242,255,0.2);
-                color:var(--cyber-blue); padding:1px 7px; border-radius:3px;">
+                display:inline-flex; align-items:center; gap:4px;
+                background:rgba(0,0,0,0.4); border:1px solid ${vtColor}40;
+                color:${vtColor}; padding:1px 7px; border-radius:3px;">
+                <span style="width:5px; height:5px; border-radius:50%; background:${vtColor}; box-shadow:0 0 5px ${vtColor}; flex-shrink:0;"></span>
                 VT: ${vtMal} engines
             </span>
             <span style="
-                background:rgba(255,0,60,0.06); border:1px solid rgba(255,0,60,0.2);
-                color:#ff7755; padding:1px 7px; border-radius:3px;">
+                display:inline-flex; align-items:center; gap:4px;
+                background:rgba(0,0,0,0.4); border:1px solid ${abColor}40;
+                color:${abColor}; padding:1px 7px; border-radius:3px;">
+                <span style="width:5px; height:5px; border-radius:50%; background:${abColor}; box-shadow:0 0 5px ${abColor}; flex-shrink:0;"></span>
                 ABUSE: ${abScore}%
             </span>
-            ${ab.isp ? `<span style="color:#444; font-size:0.55rem;">${escHtml(ab.isp)}</span>` : ''}
+            <span style="color:#555; font-size:0.5rem; letter-spacing:0.5px;">▸ DETAILS</span>
         </div>`;
+}
+
+function buildIntelDetailPanel(data) {
+    if (!data) return '<div style="color:#555; text-align:center; padding:40px;">NO DATA AVAILABLE</div>';
+    const vt = data.virustotal || {};
+    const ab = data.abuseipdb || {};
+    const score = data.threat_score ?? 0;
+    const verdict = data.verdict || 'Unknown';
+
+    const scoreColor = score >= 70 ? '#ff003c' : score >= 30 ? '#ffcc00' : '#00ff88';
+    const scoreBg = score >= 70 ? 'rgba(255,0,60,0.1)' : score >= 30 ? 'rgba(255,204,0,0.08)' : 'rgba(0,255,136,0.06)';
+    const scoreGlow = score >= 70 ? '0 0 30px rgba(255,0,60,0.3)' : score >= 30 ? '0 0 30px rgba(255,204,0,0.2)' : '0 0 30px rgba(0,255,136,0.15)';
+
+    // VT stats
+    const vtMal = vt.malicious ?? 0;
+    const vtSus = vt.suspicious ?? 0;
+    const vtHarm = vt.harmless ?? 0;
+    const vtTotal = vtMal + vtSus + vtHarm;
+    const vtMalPct = vtTotal > 0 ? ((vtMal / vtTotal) * 100).toFixed(1) : 0;
+    const vtCountry = vt.country || 'N/A';
+
+    // AbuseIPDB stats
+    const abScore = ab.abuse_score ?? 0;
+    const abReports = ab.total_reports ?? 0;
+    const abCountry = ab.country || 'N/A';
+    const abISP = ab.isp || 'Unknown';
+    const abLastReported = ab.last_reported || 'Never';
+
+    return `
+        <!-- Top Score Section -->
+        <div style="display:flex; align-items:center; gap:24px; margin-bottom:20px; padding-bottom:18px; border-bottom:1px solid rgba(255,255,255,0.05);">
+            <div class="intel-score-ring" style="background:${scoreBg}; box-shadow:${scoreGlow}; border:3px solid ${scoreColor};">
+                <div style="font-family:'Space Grotesk'; font-size:1.8rem; font-weight:700; color:${scoreColor}; line-height:1;">${score}</div>
+                <div style="font-family:'JetBrains Mono'; font-size:0.45rem; color:#666; letter-spacing:1.5px; margin-top:2px;">SCORE</div>
+            </div>
+            <div style="flex:1;">
+                <div style="font-family:'Space Grotesk'; font-size:1.3rem; font-weight:700; color:#fff; letter-spacing:1px; margin-bottom:4px;">
+                    ${escHtml(data.ip || '')}
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+                    <span style="
+                        display:inline-flex; align-items:center; gap:5px;
+                        background:${scoreBg}; border:1px solid ${scoreColor};
+                        color:${scoreColor}; padding:2px 10px; border-radius:3px;
+                        font-family:'JetBrains Mono'; font-size:0.65rem; font-weight:700; letter-spacing:1px;">
+                        ${verdict}
+                    </span>
+                    <span style="font-family:'JetBrains Mono'; font-size:0.6rem; color:#555;">
+                        ${abISP !== 'Unknown' ? escHtml(abISP) : ''}
+                    </span>
+                </div>
+                <div class="intel-mini-bar" style="width:200px;">
+                    <div class="intel-mini-bar-fill" style="width:${Math.min(score, 100)}%; background:${scoreColor}; box-shadow:0 0 8px ${scoreColor};"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VirusTotal Section -->
+        <div class="intel-source-card" style="border-left:3px solid ${vtMal >= 5 ? '#ff003c' : vtMal >= 1 ? '#ffcc00' : '#00ff88'};">
+            <div class="intel-source-title" style="color:${vtMal >= 5 ? '#ff003c' : vtMal >= 1 ? '#ffcc00' : '#00ff88'};">
+                <span style="display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </span>
+                VIRUSTOTAL ANALYSIS
+            </div>
+            <div class="intel-stat-grid">
+                <div class="intel-stat-item" style="border-color:rgba(255,0,60,0.15);">
+                    <div class="intel-stat-label" style="display:flex; align-items:center; justify-content:center; gap:4px;">
+                        <span style="width:5px; height:5px; border-radius:50%; background:#ff003c; box-shadow:0 0 5px #ff003c;"></span>
+                        MALICIOUS
+                    </div>
+                    <div class="intel-stat-value" style="color:#ff003c;">${vtMal}</div>
+                    <div style="font-size:0.5rem; color:#444; font-family:'JetBrains Mono'; margin-top:2px;">ENGINES</div>
+                </div>
+                <div class="intel-stat-item" style="border-color:rgba(255,204,0,0.15);">
+                    <div class="intel-stat-label" style="display:flex; align-items:center; justify-content:center; gap:4px;">
+                        <span style="width:5px; height:5px; border-radius:50%; background:#ffcc00; box-shadow:0 0 5px #ffcc00;"></span>
+                        SUSPICIOUS
+                    </div>
+                    <div class="intel-stat-value" style="color:#ffcc00;">${vtSus}</div>
+                    <div style="font-size:0.5rem; color:#444; font-family:'JetBrains Mono'; margin-top:2px;">ENGINES</div>
+                </div>
+                <div class="intel-stat-item" style="border-color:rgba(0,255,136,0.15);">
+                    <div class="intel-stat-label" style="display:flex; align-items:center; justify-content:center; gap:4px;">
+                        <span style="width:5px; height:5px; border-radius:50%; background:#00ff88; box-shadow:0 0 5px #00ff88;"></span>
+                        HARMLESS
+                    </div>
+                    <div class="intel-stat-value" style="color:#00ff88;">${vtHarm}</div>
+                    <div style="font-size:0.5rem; color:#444; font-family:'JetBrains Mono'; margin-top:2px;">ENGINES</div>
+                </div>
+                <div class="intel-stat-item">
+                    <div class="intel-stat-label" style="display:flex; align-items:center; justify-content:center; gap:4px;">
+                        <span style="width:5px; height:5px; border-radius:50%; background:${vtMalPct > 10 ? '#ff003c' : vtMalPct > 0 ? '#ffcc00' : '#00ff88'}; box-shadow:0 0 5px ${vtMalPct > 10 ? '#ff003c' : vtMalPct > 0 ? '#ffcc00' : '#00ff88'};"></span>
+                        DETECTION RATE
+                    </div>
+                    <div class="intel-stat-value" style="color:${vtMalPct > 10 ? '#ff003c' : vtMalPct > 0 ? '#ffcc00' : '#00ff88'};">${vtMalPct}%</div>
+                    <div style="font-size:0.5rem; color:#444; font-family:'JetBrains Mono'; margin-top:2px;">OF ${vtTotal} SCANS</div>
+                </div>
+                <div class="intel-stat-item">
+                    <div class="intel-stat-label">COUNTRY</div>
+                    <div class="intel-stat-value" style="color:var(--neon-red); font-size:0.9rem;">${escHtml(vtCountry)}</div>
+                </div>
+            </div>
+            <!-- VT Detection Bar -->
+            <div style="margin-top:12px; padding:8px 12px; background:rgba(0,0,0,0.3); border-radius:4px;">
+                <div style="font-family:'JetBrains Mono'; font-size:0.55rem; color:#444; letter-spacing:1px; margin-bottom:6px;">ENGINE DETECTION RATIO</div>
+                <div style="display:flex; height:8px; border-radius:4px; overflow:hidden; gap:1px;">
+                    <div style="flex:${vtMal}; background:#ff003c; min-width:${vtMal > 0 ? '2px' : '0'}; box-shadow:0 0 4px rgba(255,0,60,0.5);"></div>
+                    <div style="flex:${vtSus}; background:#ffcc00; min-width:${vtSus > 0 ? '2px' : '0'}; box-shadow:0 0 4px rgba(255,204,0,0.5);"></div>
+                    <div style="flex:${vtHarm}; background:#00ff88; min-width:${vtHarm > 0 ? '2px' : '0'}; opacity:0.4;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:4px;">
+                    <span style="font-family:'JetBrains Mono'; font-size:0.48rem; color:#ff003c; display:inline-flex; align-items:center; gap:3px;"><span style="width:4px; height:4px; border-radius:50%; background:#ff003c;"></span>${vtMal} MALICIOUS</span>
+                    <span style="font-family:'JetBrains Mono'; font-size:0.48rem; color:#ffcc00; display:inline-flex; align-items:center; gap:3px;"><span style="width:4px; height:4px; border-radius:50%; background:#ffcc00;"></span>${vtSus} SUSPICIOUS</span>
+                    <span style="font-family:'JetBrains Mono'; font-size:0.48rem; color:#00ff88; display:inline-flex; align-items:center; gap:3px;"><span style="width:4px; height:4px; border-radius:50%; background:#00ff88;"></span>${vtHarm} CLEAN</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- AbuseIPDB Section -->
+        <div class="intel-source-card" style="border-left:3px solid ${abScore >= 70 ? '#ff003c' : abScore >= 30 ? '#ffcc00' : '#00ff88'};">
+            <div class="intel-source-title" style="color:${abScore >= 70 ? '#ff003c' : abScore >= 30 ? '#ffcc00' : '#00ff88'};">
+                <span style="display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </span>
+                ABUSEIPDB REPORT
+            </div>
+            <div class="intel-stat-grid">
+                <div class="intel-stat-item" style="border-color:${abScore >= 70 ? 'rgba(255,0,60,0.2)' : abScore >= 30 ? 'rgba(255,204,0,0.2)' : 'rgba(0,255,136,0.2)'};">
+                    <div class="intel-stat-label" style="display:flex; align-items:center; justify-content:center; gap:4px;">
+                        <span style="width:5px; height:5px; border-radius:50%; background:${abScore >= 70 ? '#ff003c' : abScore >= 30 ? '#ffcc00' : '#00ff88'}; box-shadow:0 0 5px ${abScore >= 70 ? '#ff003c' : abScore >= 30 ? '#ffcc00' : '#00ff88'};"></span>
+                        ABUSE SCORE
+                    </div>
+                    <div class="intel-stat-value" style="color:${abScore >= 70 ? '#ff003c' : abScore >= 30 ? '#ffcc00' : '#00ff88'};">${abScore}%</div>
+                    <div class="intel-mini-bar" style="width:80px; margin:4px auto 0;">
+                        <div class="intel-mini-bar-fill" style="width:${abScore}%; background:${abScore >= 70 ? '#ff003c' : abScore >= 30 ? '#ffcc00' : '#00ff88'}; box-shadow:0 0 6px ${abScore >= 70 ? 'rgba(255,0,60,0.5)' : abScore >= 30 ? 'rgba(255,204,0,0.5)' : 'rgba(0,255,136,0.3)'};"></div>
+                    </div>
+                </div>
+                <div class="intel-stat-item">
+                    <div class="intel-stat-label" style="display:flex; align-items:center; justify-content:center; gap:4px;">
+                        <span style="width:5px; height:5px; border-radius:50%; background:${abReports > 10 ? '#ff003c' : abReports > 0 ? '#ffcc00' : '#00ff88'}; box-shadow:0 0 5px ${abReports > 10 ? '#ff003c' : abReports > 0 ? '#ffcc00' : '#00ff88'};"></span>
+                        TOTAL REPORTS
+                    </div>
+                    <div class="intel-stat-value" style="color:${abReports > 10 ? '#ff003c' : abReports > 0 ? '#ffcc00' : '#555'};">${abReports}</div>
+                    <div style="font-size:0.5rem; color:#444; font-family:'JetBrains Mono'; margin-top:2px;">FILED</div>
+                </div>
+                <div class="intel-stat-item">
+                    <div class="intel-stat-label">COUNTRY</div>
+                    <div class="intel-stat-value" style="color:var(--neon-red); font-size:0.9rem;">${escHtml(abCountry)}</div>
+                </div>
+                <div class="intel-stat-item">
+                    <div class="intel-stat-label">ISP</div>
+                    <div class="intel-stat-value" style="color:#aaa; font-size:0.65rem; word-break:break-all;">${escHtml(abISP)}</div>
+                </div>
+                <div class="intel-stat-item">
+                    <div class="intel-stat-label">LAST REPORTED</div>
+                    <div class="intel-stat-value" style="color:#888; font-size:0.65rem;">${escHtml(abLastReported)}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="margin-top:18px; display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn" onclick="closeIntelOverlay()" 
+                    style="border-color:var(--neon-red); color:var(--neon-red); background:rgba(255,0,60,0.05); padding:6px 16px; font-size:0.7rem; letter-spacing:1px;">
+                CLOSE REPORT
+            </button>
+        </div>
+    `;
+}
+
+function showIntelDetail(ip) {
+    const data = enrichmentCache[ip];
+    if (!data) return;
+    const overlay = document.getElementById('threat-intel-overlay');
+    const content = document.getElementById('intel-detail-content');
+    if (!overlay || !content) return;
+    content.innerHTML = buildIntelDetailPanel(data);
+    overlay.style.display = 'flex';
+}
+
+function closeIntelOverlay() {
+    document.getElementById('threat-intel-overlay').style.display = 'none';
 }
 
 async function enrichIncidentCards() {
@@ -1831,9 +2197,9 @@ async function enrichIncidentCards() {
         const container = card.querySelector('.intel-slot');
         if (!container || container.dataset.done) continue;
         container.dataset.done = '1';
-        container.innerHTML = `<span style="color:#333; font-family:'JetBrains Mono'; font-size:0.55rem; letter-spacing:1px;">QUERYING INTEL...</span>`;
+        container.innerHTML = `<span style="color:#444; font-family:'JetBrains Mono'; font-size:0.55rem; letter-spacing:1px; display:inline-flex; align-items:center; gap:5px;">QUERYING INTEL...</span>`;
         const data = await enrichIP(ip);
-        container.innerHTML = data ? buildIntelBadge(data) : '';
+        container.innerHTML = data ? buildIntelBadge(data, ip) : '';
     }
 }
 
@@ -1844,17 +2210,30 @@ async function enrichForensicsTable() {
         const cell = row.querySelector('.intel-cell');
         if (!cell || cell.dataset.done) continue;
         cell.dataset.done = '1';
+        cell.innerHTML = '<span style="color:#222; font-size:0.5rem; font-family:\'JetBrains Mono\'; letter-spacing:0.5px;">ANALYZING...</span>';
         const data = await enrichIP(ip);
         if (!data) { cell.innerHTML = '<span style="color:#333;">—</span>'; continue; }
         const score = data.threat_score ?? 0;
-        const color = score >= 70 ? 'var(--neon-red)' : score >= 30 ? '#ffcc00' : '#00ff88';
+        const color = score >= 70 ? '#ff003c' : score >= 30 ? '#ffcc00' : '#00ff88';
+        const vt = data.virustotal || {};
+        const ab = data.abuseipdb || {};
+        const vtMalVal = vt.malicious ?? 0;
+        const abScoreVal = ab.abuse_score ?? 0;
+        const vtCellColor = vtMalVal >= 5 ? '#ff003c' : vtMalVal >= 1 ? '#ffcc00' : '#00ff88';
+        const abCellColor = abScoreVal >= 70 ? '#ff003c' : abScoreVal >= 30 ? '#ffcc00' : '#00ff88';
         cell.innerHTML = `
-            <span style="
-                color:${color}; font-family:'JetBrains Mono'; font-size:0.65rem;
-                font-weight:700; cursor:help;"
-                title="VT: ${data.virustotal?.malicious ?? '?'} malicious | AbuseIPDB: ${data.abuseipdb?.abuse_score ?? '?'}% | ${data.abuseipdb?.isp ?? ''}">
-                ${data.verdict}
-            </span>`;
+            <div class="intel-badge-clickable" onclick="showIntelDetail('${escHtml(ip)}')" style="display:inline-flex; flex-direction:column; gap:2px;">
+                <span style="
+                    display:inline-flex; align-items:center; gap:4px;
+                    color:${color}; font-family:'JetBrains Mono'; font-size:0.6rem;
+                    font-weight:700;">
+                    ${data.verdict}
+                </span>
+                <span style="font-family:'JetBrains Mono'; font-size:0.48rem; color:#555; display:flex; gap:6px;">
+                    <span style="display:inline-flex; align-items:center; gap:3px; color:${vtCellColor};"><span style="width:4px; height:4px; border-radius:50%; background:${vtCellColor};"></span>VT:${vt.malicious ?? '?'}</span>
+                    <span style="display:inline-flex; align-items:center; gap:3px; color:${abCellColor};"><span style="width:4px; height:4px; border-radius:50%; background:${abCellColor};"></span>AB:${ab.abuse_score ?? '?'}%</span>
+                </span>
+            </div>`;
     }
 }
 

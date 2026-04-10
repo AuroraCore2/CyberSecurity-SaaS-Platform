@@ -141,7 +141,7 @@ def run_detection(db: Session, events_to_analyze=None):
                 type="DIRECTORY_TRAVERSAL",
                 severity="CRITICAL",
                 source_ip=ip,
-                description=f"🚨 {rule['name']} | Pattern: {rule['pattern']} | Target: {resource or action[:100]} | Detected via Signature",
+                description=f"{rule['name']} | Pattern: {rule['pattern']} | Target: {resource or action[:100]} | Detected via Signature",
                 timestamp=timestamp
             )
             # Store raw log for Oracle analysis
@@ -158,7 +158,7 @@ def run_detection(db: Session, events_to_analyze=None):
                 type="SQL_INJECTION",
                 severity="CRITICAL",
                 source_ip=ip,
-                description=f"🚨 {rule['name']} | Pattern: {rule['pattern']} | Vector: {action[:100]} | Detected via Signature",
+                description=f"{rule['name']} | Pattern: {rule['pattern']} | Vector: {action[:100]} | Detected via Signature",
                 timestamp=timestamp
             )
             # Store raw log for Oracle analysis
@@ -194,7 +194,7 @@ def run_detection(db: Session, events_to_analyze=None):
                         type="SSH_BRUTE_FORCE",
                         severity=rule["severity"],
                         source_ip=ip,
-                        description=f"🚨 {rule['name']} | Adaptive Rule: ≥{adaptive_ssh_threshold} attempts (dataset: μ={avg_ssh_fails:.1f}, σ={std_ssh_fails:.1f}) | Detected: {count} attempts | Method: {rule['category']}",
+                        description=f"{rule['name']} | Adaptive Rule: ≥{adaptive_ssh_threshold} attempts (dataset: μ={avg_ssh_fails:.1f}, σ={std_ssh_fails:.1f}) | Detected: {count} attempts | Method: {rule['category']}",
                         timestamp=ip_last_ts.get(ip)
                     )
                     # For aggregate incidents, use a summary or the last seen raw log
@@ -216,7 +216,7 @@ def run_detection(db: Session, events_to_analyze=None):
                         type="HTTP_BRUTE_FORCE",
                         severity=rule["severity"],
                         source_ip=ip,
-                        description=f"🚨 {rule['name']} | Adaptive Rule: ≥{adaptive_http_threshold} failed requests (dataset: μ={avg_http_fails:.1f}, σ={std_http_fails:.1f}) | Detected: {count} failed requests | Method: {rule['category']}",
+                        description=f"{rule['name']} | Adaptive Rule: ≥{adaptive_http_threshold} failed requests (dataset: μ={avg_http_fails:.1f}, σ={std_http_fails:.1f}) | Detected: {count} failed requests | Method: {rule['category']}",
                         timestamp=ip_last_ts.get(ip)
                     )
                     db.add(incident)
@@ -236,7 +236,7 @@ def run_detection(db: Session, events_to_analyze=None):
                         type="PORT_SCAN",
                         severity=rule["severity"],
                         source_ip=ip,
-                        description=f"🚨 {rule['name']} | Adaptive Rule: ≥{adaptive_port_threshold} ports scanned (dataset: μ={avg_ports:.1f}, σ={std_ports:.1f}) | Detected: {len(ports)} ports | Method: {rule['category']}",
+                        description=f"{rule['name']} | Adaptive Rule: ≥{adaptive_port_threshold} ports scanned (dataset: μ={avg_ports:.1f}, σ={std_ports:.1f}) | Detected: {len(ports)} ports | Method: {rule['category']}",
                         timestamp=ip_last_ts.get(ip)
                     )
                     db.add(incident)
@@ -253,7 +253,7 @@ def run_detection(db: Session, events_to_analyze=None):
                     type="SSH_BRUTE_FORCE",
                     severity=rule["severity"],
                     source_ip=ip,
-                    description=f"🚨 {rule['name']} | Rule: {rule['pattern']} | Triggered: {count} attempts detected | Method: {rule['category']}"
+                    description=f"{rule['name']} | Rule: {rule['pattern']} | Triggered: {count} attempts detected | Method: {rule['category']}"
                 )
                 db.add(incident)
                 created_incidents.append(incident)
@@ -266,7 +266,7 @@ def run_detection(db: Session, events_to_analyze=None):
                     type="HTTP_BRUTE_FORCE",
                     severity=rule["severity"],
                     source_ip=ip,
-                    description=f"🚨 {rule['name']} | Rule: {rule['pattern']} | Triggered: {count} failed requests | Method: {rule['category']}",
+                    description=f"{rule['name']} | Rule: {rule['pattern']} | Triggered: {count} failed requests | Method: {rule['category']}",
                     timestamp=ip_last_ts.get(ip)
                 )
                 db.add(incident)
@@ -280,7 +280,7 @@ def run_detection(db: Session, events_to_analyze=None):
                     type="PORT_SCAN",
                     severity=rule["severity"],
                     source_ip=ip,
-                    description=f"🚨 {rule['name']} | Rule: {rule['pattern']} | Triggered: {len(ports)} ports scanned | Method: {rule['category']}",
+                    description=f"{rule['name']} | Rule: {rule['pattern']} | Triggered: {len(ports)} ports scanned | Method: {rule['category']}",
                     timestamp=ip_last_ts.get(ip)
                 )
                 db.add(incident)
@@ -317,7 +317,7 @@ def run_detection(db: Session, events_to_analyze=None):
                             type="IP_VOLUME_ANOMALY",
                             severity=severity,
                             source_ip=ip,
-                            description=f"📊 {rule['name']} | Rule: {rule['pattern']} | Baseline: {avg:.1f}±{std:.1f} events | Detected: {count} events | Z-score: {z_score:.2f} | Method: {rule['category']}",
+                            description=f"IP Volume Anomaly | Rule: {rule['pattern']} | Baseline: {avg:.1f}±{std:.1f} events | Detected: {count} events | Z-score: {z_score:.2f} | Method: {rule['category']}",
                             timestamp=ip_last_ts.get(ip)
                         )
                         db.add(incident)
@@ -343,7 +343,7 @@ def run_detection(db: Session, events_to_analyze=None):
                 type="MULTI_VECTOR_ATTACK",
                 severity="HIGH",
                 source_ip=ip,
-                description=f"🎯 {rule['name']} | Rule: {rule['pattern']} | Vectors: {', '.join(sources)} | Total: {len(sources)} vectors | Method: {rule['category']}",
+                description=f"Multi-Vector Attack Pattern | Rule: {rule['pattern']} | Vectors: {', '.join(sources)} | Total: {len(sources)} vectors | Method: {rule['category']}",
                 timestamp=ip_last_ts.get(ip)
             )
             db.add(incident)
@@ -358,7 +358,7 @@ def run_detection(db: Session, events_to_analyze=None):
                     type="HIGH_THREAT_RATIO",
                     severity="HIGH",
                     source_ip=ip,
-                    description=f"⚠️ High Threat IP | {stats['high']}/{stats['total']} events malicious ({threat_ratio*100:.0f}%) | Persistent attacker pattern | Method: ML-Based (Behavioral Analysis)",
+                    description=f"High Threat IP | {stats['high']}/{stats['total']} events malicious ({threat_ratio*100:.0f}%) | Persistent attacker pattern | Method: ML-Based (Behavioral Analysis)",
                     timestamp=ip_last_ts.get(ip)
                 )
                 db.add(incident)
