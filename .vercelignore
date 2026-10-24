@@ -1,0 +1,20 @@
+# Dependencies
+*.db
+*.sqlite3
+__pycache__/
+.git/
+.env
+.venv/
+venv/
+env/
+
+# Large/unnecessary files
+images/
+*.csv
+*.log
+*.txt
+!requirements.txt
+
+# OS
+.DS_Store
+Thumbs.db

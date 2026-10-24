@@ -66,10 +66,12 @@ app.include_router(incidents.router)
 app.include_router(chat.router)
 app.include_router(threat_intel_router) 
 
-# Resolve frontend path relative to this file
-# Works locally, on Railway, and handles Vercel serverless environment
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FRONTEND_PATH = os.path.join(BASE_DIR, "app", "frontend", "index.html")
+# Resolve frontend path — try multiple locations for Vercel compatibility
+_POSSIBLE_FRONTEND_PATHS = [
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "index.html"),
+    os.path.join(BASE_DIR, "app", "frontend", "index.html"),
+]
+FRONTEND_PATH = next((p for p in _POSSIBLE_FRONTEND_PATHS if os.path.exists(p)), _POSSIBLE_FRONTEND_PATHS[0])
 
 # Root path for Vercel compatibility
 @app.get("/api/health")
